@@ -13,7 +13,12 @@ class BuilderTest < Minitest::Test
 
   def test_compiler_type_is_known
     builder = Microbuild::Builder.new
-    assert_includes [:clang, :gcc, :msvc], builder.compiler[:type]
+    assert_includes [:clang, :gcc, :msvc], builder.compiler.type
+  end
+
+  def test_compiler_is_compiler_info_struct
+    builder = Microbuild::Builder.new
+    assert_instance_of Microbuild::CompilerInfo, builder.compiler
   end
 
   def test_raises_when_no_compiler_found
@@ -26,6 +31,73 @@ class BuilderTest < Minitest::Test
       end
     end
     assert_raises(Microbuild::CompilerNotFoundError) { klass.new }
+  end
+
+  # ---------------------------------------------------------------------------
+  # log accumulation
+  # ---------------------------------------------------------------------------
+  def test_log_is_empty_before_any_command
+    builder = Microbuild::Builder.new
+    assert_empty builder.log
+  end
+
+  def test_log_accumulates_entries_after_compile
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      assert_equal 1, builder.log.size
+      entry = builder.log.first
+      assert entry.key?(:command), "log entry should have :command"
+      assert entry.key?(:stdout),  "log entry should have :stdout"
+      assert entry.key?(:stderr),  "log entry should have :stderr"
+    end
+  end
+
+  def test_log_grows_with_each_invocation
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "main.c")
+      obj = File.join(dir, "main.o")
+      exe = File.join(dir, "main")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      builder.link([obj], exe)
+      assert_equal 2, builder.log.size
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # log_sink
+  # ---------------------------------------------------------------------------
+  def test_log_sink_is_called_for_each_command
+    received = []
+    sink = ->(entry) { received << entry }
+    builder = Microbuild::Builder.new(log_sink: sink)
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      assert_equal 1, received.size
+      assert received.first.key?(:stdout)
+    end
+  end
+
+  def test_no_log_sink_does_not_raise
+    builder = Microbuild::Builder.new(log_sink: nil)
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      assert builder.compile(src, obj), "expected compile to succeed"
+    end
   end
 
   # ---------------------------------------------------------------------------

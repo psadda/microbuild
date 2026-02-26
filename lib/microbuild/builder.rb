@@ -4,27 +4,38 @@ module Microbuild
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end
 
+  # Holds information about a detected compiler toolchain.
+  #   type – symbolic name (:clang, :gcc, :msvc)
+  #   c    – command used to compile C source files
+  #   cxx  – command used to compile C++ source files
+  #   ld   – command used to link object files
+  CompilerInfo = Struct.new(:type, :c, :cxx, :ld)
+
   # Builder wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
-    # Ordered list of compiler candidates to probe.  Each entry is a Hash with:
-    #   :c   – command used to compile C source files
-    #   :cxx – command used to compile C++ source files
-    #   :ld  – command used to link object files
-    #   :type – symbolic name for the toolchain
+    # Ordered list of compiler candidates to probe.
     COMPILER_CANDIDATES = [
-      { type: :clang, c: "clang",   cxx: "clang++", ld: "clang++" },
-      { type: :gcc,   c: "gcc",     cxx: "g++",     ld: "g++"     },
-      { type: :msvc,  c: "cl",      cxx: "cl",      ld: "link"    },
+      CompilerInfo.new(:clang, "clang",   "clang++", "clang++"),
+      CompilerInfo.new(:gcc,   "gcc",     "g++",     "g++"    ),
+      CompilerInfo.new(:msvc,  "cl",      "cl",      "link"   ),
     ].freeze
 
-    # The detected toolchain Hash (see COMPILER_CANDIDATES).
+    # The detected toolchain (a CompilerInfo struct).
     attr_reader :compiler
+
+    # Accumulated log entries from all compile/link invocations.
+    # Each entry is a Hash with :command, :stdout, and :stderr keys.
+    attr_reader :log
 
     # Detects the first available C/C++ compiler toolchain.
     #
+    # @param log_sink [#call, nil] optional callable invoked with each log entry Hash
+    #                              after every compile or link command.
     # @raise [CompilerNotFoundError] if no supported compiler is found.
-    def initialize
+    def initialize(log_sink: nil)
+      @log_sink = log_sink
+      @log = []
       @compiler = detect_compiler!
     end
 
@@ -55,7 +66,7 @@ module Microbuild
 
     def detect_compiler!
       COMPILER_CANDIDATES.each do |candidate|
-        return candidate if compiler_available?(candidate[:c])
+        return candidate if compiler_available?(candidate.c)
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
     end
@@ -72,10 +83,10 @@ module Microbuild
     end
 
     def build_compile_command(source, output, flags, include_paths, definitions)
-      if compiler[:type] == :msvc
+      if compiler.type == :msvc
         build_msvc_compile_command(source, output, flags, include_paths, definitions)
       else
-        cc = c_file?(source) ? compiler[:c] : compiler[:cxx]
+        cc = c_file?(source) ? compiler.c : compiler.cxx
         inc_flags = include_paths.map { |p| "-I#{p}" }
         def_flags = definitions.map  { |d| "-D#{d}" }
         [cc, *flags, *inc_flags, *def_flags, "-c", source, "-o", output]
@@ -85,20 +96,27 @@ module Microbuild
     def build_msvc_compile_command(source, output, flags, include_paths, definitions)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map  { |d| "/D#{d}" }
-      [compiler[:c], *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
+      [compiler.c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
     end
 
     def build_link_command(object_files, output)
-      if compiler[:type] == :msvc
-        [compiler[:ld], *object_files, "/OUT:#{output}"]
+      if compiler.type == :msvc
+        [compiler.ld, *object_files, "/OUT:#{output}"]
       else
-        [compiler[:ld], *object_files, "-o", output]
+        [compiler.ld, *object_files, "-o", output]
       end
     end
 
     def run_command(cmd)
-      _out, _err, status = Open3.capture3(*cmd)
+      out, err, status = Open3.capture3(*cmd)
+      record_output(cmd, out, err)
       status.success?
+    end
+
+    def record_output(command, stdout, stderr)
+      entry = { command: command, stdout: stdout, stderr: stderr }
+      @log << entry
+      @log_sink.call(entry) if @log_sink.respond_to?(:call)
     end
   end
 end
