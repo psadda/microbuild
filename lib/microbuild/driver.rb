@@ -63,16 +63,27 @@ module Microbuild
     #
     # @param source_file_path [String] path to the .c or .cpp source file
     # @param output_path      [String] path for the resulting object file
-    # @param flags            [Array<Symbol>] extra compiler flags
+    # @param flags            [Array<Symbol>] compiler flags
+    # @param xflags           [Hash{Symbol => String] extra (native) compiler flags
     # @param include_paths    [Array<String>] directories to add with -I
     # @param definitions      [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
     # @param force            [Boolean] when true, always compile even if output is up-to-date
     # @param env              [Hash] environment variables to set for the subprocess
     # @param working_dir      [String] working directory for the subprocess (default: ".")
     # @return [Boolean] true if compilation succeeded (or was skipped), false otherwise
-    def compile(source_file_path, output_path, flags: [], include_paths: [], definitions: [],
-                force: false, env: {}, working_dir: ".")
+    def compile(
+      source_file_path,
+      output_path,
+      flags: [],
+      xflags: {},
+      include_paths: [],
+      definitions: [],
+      force: false,
+      env: {},
+      working_dir: "."
+    )
       flags = translate_flags(flags)
+      flags.concat!(xflags[@toolchain.type] || [])
 
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
