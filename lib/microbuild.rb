@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "microbuild/builder"
+require "microbuild/driver"
 
 module Microbuild
 
