@@ -20,7 +20,7 @@ class MsvcToolchainTest < Minitest::Test
   def stub_msvc_class(cl_on_path: false, &block)
     klass = Class.new(Microbuild::MsvcToolchain) do
       define_method(:command_available?) do |cmd|
-        cl_on_path && %w[cl link lib].include?(cmd)
+        cl_on_path && cmd == "cl"
       end
 
       def run_vswhere(*)   = nil
@@ -42,7 +42,6 @@ class MsvcToolchainTest < Minitest::Test
 
     assert_equal "cl", tc.c
     assert_equal "cl", tc.cxx
-    assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_cl_is_on_path
@@ -176,7 +175,7 @@ class MsvcToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::MsvcToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && %w[cl link lib].include?(cmd)
+          setup_done && cmd == "cl"
         end
         define_method(:run_vswhere) { |*_args| devenv }
         define_method(:run_vcvarsall) do |_path|
@@ -208,7 +207,7 @@ class ClangClToolchainTest < Minitest::Test
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
     klass = Class.new(Microbuild::ClangClToolchain) do
       define_method(:command_available?) do |cmd|
-        clang_cl_on_path && %w[clang-cl link lib].include?(cmd)
+        clang_cl_on_path && cmd == "clang-cl"
       end
 
       def run_vswhere(*)   = nil
@@ -233,12 +232,6 @@ class ClangClToolchainTest < Minitest::Test
 
     assert_equal "clang-cl", tc.c
     assert_equal "clang-cl", tc.cxx
-  end
-
-  def test_linker_is_link
-    tc = stub_clang_cl_class(clang_cl_on_path: true).new
-
-    assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_clang_cl_is_on_path
@@ -281,7 +274,7 @@ class ClangClToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::ClangClToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && %w[clang-cl link lib].include?(cmd)
+          setup_done && cmd == "clang-cl"
         end
         define_method(:run_vswhere) { |*_args| devenv }
         define_method(:run_vcvarsall) do |_path|
@@ -299,6 +292,109 @@ class ClangClToolchainTest < Minitest::Test
         ENV.delete(env_key)
       end
     end
+  end
+
+end
+
+class GnuToolchainCommandTest < Minitest::Test
+
+  # GnuToolchain#command is a pure method – no subprocess calls needed.
+
+  def gnu
+    Class.new(Microbuild::GnuToolchain) do
+      def command_available?(_cmd) = true
+    end.new
+  end
+
+  # ---------------------------------------------------------------------------
+  # libs: linker flags
+  # ---------------------------------------------------------------------------
+
+  def test_libs_produce_dash_l_flags_in_link_mode
+    cmd = gnu.command(["main.o"], "main", [], [], [], ["m", "pthread"], [])
+
+    assert_includes cmd, "-lm"
+    assert_includes cmd, "-lpthread"
+  end
+
+  def test_libs_omitted_in_compile_only_mode
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], ["m"], [])
+
+    refute_includes cmd, "-lm"
+  end
+
+  # ---------------------------------------------------------------------------
+  # linker_include_dirs: search path flags
+  # ---------------------------------------------------------------------------
+
+  def test_linker_include_dirs_produce_dash_L_flags_in_link_mode
+    cmd = gnu.command(["main.o"], "main", [], [], [], [], ["/opt/lib", "/usr/local/lib"])
+
+    assert_includes cmd, "-L/opt/lib"
+    assert_includes cmd, "-L/usr/local/lib"
+  end
+
+  def test_linker_include_dirs_omitted_in_compile_only_mode
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], ["/opt/lib"])
+
+    refute_includes cmd, "-L/opt/lib"
+  end
+
+end
+
+class MsvcToolchainCommandTest < Minitest::Test
+
+  # Override initialize to avoid the super arity issue in MsvcToolchain#initialize,
+  # following the same pattern as msvc_for_vcvarsall_command in MsvcToolchainTest.
+  def msvc
+    Class.new(Microbuild::MsvcToolchain) do
+      def initialize
+        @type = :msvc
+        @c    = "cl"
+        @cxx  = "cl"
+      end
+    end.new
+  end
+
+  # ---------------------------------------------------------------------------
+  # libs: library arguments
+  # ---------------------------------------------------------------------------
+
+  def test_libs_produce_dot_lib_in_link_mode
+    cmd = msvc.command(["main.obj"], "main.exe", [], [], [], ["user32", "gdi32"], [])
+
+    assert_includes cmd, "user32.lib"
+    assert_includes cmd, "gdi32.lib"
+  end
+
+  def test_libs_omitted_in_compile_only_mode
+    cmd = msvc.command(["main.c"], "main.obj", ["/c"], [], [], ["user32"], [])
+
+    refute_includes cmd, "user32.lib"
+  end
+
+  # ---------------------------------------------------------------------------
+  # linker_include_dirs: /link /LIBPATH:
+  # ---------------------------------------------------------------------------
+
+  def test_linker_include_dirs_produce_libpath_in_link_mode
+    cmd = msvc.command(["main.obj"], "main.exe", [], [], [], [], ["C:\\mylibs"])
+
+    assert_includes cmd, "/link"
+    assert_includes cmd, "/LIBPATH:C:\\mylibs"
+  end
+
+  def test_linker_include_dirs_omitted_in_compile_only_mode
+    cmd = msvc.command(["main.c"], "main.obj", ["/c"], [], [], [], ["C:\\mylibs"])
+
+    refute_includes cmd, "/link"
+    refute_includes cmd, "/LIBPATH:C:\\mylibs"
+  end
+
+  def test_link_switch_absent_when_no_linker_include_dirs
+    cmd = msvc.command(["main.obj"], "main.exe", [], [], [], [], [])
+
+    refute_includes cmd, "/link"
   end
 
 end

@@ -250,6 +250,49 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_parse_link_args_lib_short_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "main.o"])
+
+    assert_equal ["m"], options[:libs]
+  end
+
+  def test_parse_link_args_lib_long_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "--lib", "pthread", "main.o"])
+
+    assert_equal ["pthread"], options[:libs]
+  end
+
+  def test_parse_link_args_multiple_libs
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "-l", "pthread", "main.o"])
+
+    assert_equal ["m", "pthread"], options[:libs]
+  end
+
+  def test_parse_link_args_libdir_short_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-L", "/usr/local/lib", "main.o"])
+
+    assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_link_args_libdir_long_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "--libdir", "/opt/lib", "main.o"])
+
+    assert_equal ["/opt/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_link_args_libs_and_libdirs_defaults_to_empty
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "main.o"])
+
+    assert_equal [], options[:libs]
+    assert_equal [], options[:linker_include_dirs]
+  end
+
   # ---------------------------------------------------------------------------
   # run – unknown subcommand exits
   # ---------------------------------------------------------------------------
@@ -272,7 +315,7 @@ class CLITest < Minitest::Test
   # without triggering real compiler invocations.
   # ---------------------------------------------------------------------------
 
-  # A stub that records Driver#compile / link_* calls without running subprocesses.
+  # A stub that records Driver#invoke calls without running subprocesses.
   class StubDriver
 
     attr_reader :calls
@@ -281,23 +324,10 @@ class CLITest < Minitest::Test
       @calls = []
     end
 
-    def compile(source, output, flags: [], xflags: {}, include_paths: [], definitions: [], **)
-      @calls << { method: :compile, source:, output:, flags:, xflags:, include_paths:, definitions: }
-      true
-    end
-
-    def link_executable(objects, output, **)
-      @calls << { method: :link_executable, objects:, output: }
-      true
-    end
-
-    def link_static(objects, output, **)
-      @calls << { method: :link_static, objects:, output: }
-      true
-    end
-
-    def link_shared(objects, output, **)
-      @calls << { method: :link_shared, objects:, output: }
+    def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],
+               libs: [], linker_include_dirs: [], **)
+      @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
+                  include_paths:, definitions:, libs:, linker_include_dirs: }
       true
     end
 
@@ -316,23 +346,24 @@ class CLITest < Minitest::Test
 
   end
 
-  def test_run_c_dispatches_compile_with_output
+  def test_run_c_dispatches_invoke_with_output
     cli = TestCLI.new
     cli.run(["c", "-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
 
-    assert_equal :compile, call[:method]
-    assert_equal "main.c",  call[:source]
-    assert_equal "main.o",  call[:output]
+    assert_equal :invoke,  call[:method]
+    assert_equal "main.c", call[:input_files].first
+    assert_equal "main.o", call[:output]
+    assert_includes call[:flags], :objects
   end
 
-  def test_run_cxx_dispatches_compile
+  def test_run_cxx_dispatches_invoke
     cli = TestCLI.new
     cli.run(["cxx", "-o", "hello.o", "hello.cpp"])
 
-    assert_equal :compile,    cli.stub_driver.calls.first[:method]
-    assert_equal "hello.cpp", cli.stub_driver.calls.first[:source]
+    assert_equal :invoke,     cli.stub_driver.calls.first[:method]
+    assert_equal "hello.cpp", cli.stub_driver.calls.first[:input_files].first
   end
 
   def test_run_compile_forwards_flags
@@ -344,6 +375,7 @@ class CLITest < Minitest::Test
     assert_includes flags, :o2
     assert_includes flags, :avx
     assert_includes flags, :debug
+    assert_includes flags, :objects
   end
 
   def test_run_compile_forwards_includes_and_defines
@@ -378,23 +410,37 @@ class CLITest < Minitest::Test
 
     call = cli.stub_driver.calls.first
 
-    assert_equal :link_executable, call[:method]
-    assert_equal ["a.o", "b.o"],   call[:objects]
-    assert_equal "myapp",          call[:output]
+    assert_equal :invoke,        call[:method]
+    assert_equal ["a.o", "b.o"], call[:input_files]
+    assert_equal "myapp",        call[:output]
+    refute_includes call[:flags], :static
+    refute_includes call[:flags], :shared
   end
 
   def test_run_link_static_dispatches_correctly
     cli = TestCLI.new
     cli.run(["link", "static", "-o", "lib.a", "a.o"])
 
-    assert_equal :link_static, cli.stub_driver.calls.first[:method]
+    assert_equal :invoke, cli.stub_driver.calls.first[:method]
+    assert_includes cli.stub_driver.calls.first[:flags], :static
   end
 
   def test_run_link_shared_dispatches_correctly
     cli = TestCLI.new
     cli.run(["link", "shared", "-o", "lib.so", "a.o"])
 
-    assert_equal :link_shared, cli.stub_driver.calls.first[:method]
+    assert_equal :invoke, cli.stub_driver.calls.first[:method]
+    assert_includes cli.stub_driver.calls.first[:flags], :shared
+  end
+
+  def test_run_link_forwards_libs_and_linker_include_dirs
+    cli = TestCLI.new
+    cli.run(["link", "executable", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
+
+    call = cli.stub_driver.calls.first
+
+    assert_equal ["m", "pthread"], call[:libs]
+    assert_equal ["/opt/lib"],     call[:linker_include_dirs]
   end
 
 end

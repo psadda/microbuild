@@ -25,13 +25,14 @@ module Microbuild
         cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
         asan ubsan msan
         no_rtti no_exceptions pic
+        objects shared static
       ]
     ).freeze
 
     # The detected toolchain (a Toolchain subclass instance).
     attr_reader :toolchain
 
-    # Accumulated log entries from all compile/link invocations.
+    # Accumulated log entries from all invoke invocations.
     # Each entry is a Hash with :command, :stdout, and :stderr keys.
     attr_reader :log
 
@@ -56,101 +57,49 @@ module Microbuild
       @toolchain = detect_toolchain!
     end
 
-    # Compiles a single source file into an object file.
-    # Skips compilation if +output_path+ already exists and is newer than
-    # +source_file_path+. Pass <tt>force: true</tt> to always recompile.
+    # Invokes the compiler driver for the given input files and output path.
+    # The kind of output (object files, executable, shared library, or static
+    # library) is determined by the flags: +:objects+, +:shared+, or +:static+.
+    # When none of these mode flags is present, an executable is produced.
+    #
+    # Skips the invocation if +output_path+ already exists and is newer than all
+    # +input_files+. Pass <tt>force: true</tt> to always re-invoke.
     # Relative +output_path+ values are resolved under +output_dir+.
     #
-    # @param source_file_path [String] path to the .c or .cpp source file
-    # @param output_path      [String] path for the resulting object file
-    # @param flags            [Array<Symbol>] compiler flags
-    # @param xflags           [Hash{Symbol => String] extra (native) compiler flags
-    # @param include_paths    [Array<String>] directories to add with -I
-    # @param definitions      [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
-    # @param force            [Boolean] when true, always compile even if output is up-to-date
-    # @param env              [Hash] environment variables to set for the subprocess
-    # @param working_dir      [String] working directory for the subprocess (default: ".")
-    # @return [Boolean] true if compilation succeeded (or was skipped), false otherwise
-    def compile(
-      source_file_path,
+    # @param input_files          [String, Array<String>] paths to the input files
+    # @param output_path          [String] path for the resulting output file
+    # @param flags                [Array<Symbol>] compiler/linker flags
+    # @param xflags               [Hash{Symbol => String}] extra (native) compiler flags
+    # @param include_paths        [Array<String>] directories to add with -I
+    # @param definitions          [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
+    # @param libs                 [Array<String>] library names to link (e.g. "m", "pthread")
+    # @param linker_include_dirs  [Array<String>] linker library search paths (-L / /LIBPATH:)
+    # @param force                [Boolean] when true, always invoke even if output is up-to-date
+    # @param env                  [Hash] environment variables to set for the subprocess
+    # @param working_dir          [String] working directory for the subprocess (default: ".")
+    # @return [Boolean] true if invocation succeeded (or was skipped), false otherwise
+    def invoke(
+      input_files,
       output_path,
       flags: [],
       xflags: {},
       include_paths: [],
       definitions: [],
+      libs: [],
+      linker_include_dirs: [],
       force: false,
       env: {},
       working_dir: "."
     )
+      input_files = Array(input_files)
       flags = translate_flags(flags)
       flags.concat(xflags[@toolchain.type] || [])
 
       out = resolve_output(output_path)
-      return true if !force && up_to_date?(out, [source_file_path])
+      return true if !force && up_to_date?(out, input_files)
 
-      cmd = @toolchain.compile_command(source_file_path, out, flags, include_paths, definitions)
+      cmd = @toolchain.command(input_files, out, flags, include_paths, definitions, libs, linker_include_dirs)
       run_command(cmd, env:, working_dir:)
-    end
-
-    # Links one or more object files into an executable.
-    # Skips linking if +output_path+ already exists and is newer than all
-    # +object_file_paths+. Pass <tt>force: true</tt> to always re-link.
-    # Relative +output_path+ values are resolved under +output_dir+.
-    #
-    # @param object_file_paths [Array<String>] paths to the object files to link
-    # @param output_path       [String] path for the resulting executable
-    # @param force             [Boolean] when true, always link even if output is up-to-date
-    # @param env               [Hash] environment variables to set for the subprocess
-    # @param working_dir       [String] working directory for the subprocess (default: ".")
-    # @return [Boolean] true if linking succeeded (or was skipped), false otherwise
-    def link_executable(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
-      out = resolve_output(output_path)
-      return true if !force && up_to_date?(out, object_file_paths)
-
-      run_command(@toolchain.link_executable_command(object_file_paths, out), env:, working_dir:)
-    end
-
-    # Archives one or more object files into a static library.
-    # Uses +ar rcs+ on Unix (plus +ranlib+ if detected) and +lib+ on MSVC.
-    # Skips archiving if +output_path+ is already up-to-date. Pass
-    # <tt>force: true</tt> to always re-archive.
-    # Relative +output_path+ values are resolved under +output_dir+.
-    # Returns false if the archiver (+ar+ / +lib+) is not available.
-    #
-    # @param object_file_paths [Array<String>] paths to the object files
-    # @param output_path       [String] path for the resulting static library
-    # @param force             [Boolean] when true, always archive even if output is up-to-date
-    # @param env               [Hash] environment variables to set for the subprocess
-    # @param working_dir       [String] working directory for the subprocess (default: ".")
-    # @return [Boolean] true if archiving succeeded (or was skipped), false otherwise
-    def link_static(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
-      return false unless toolchain.ar
-
-      out = resolve_output(output_path)
-      return true if !force && up_to_date?(out, object_file_paths)
-
-      @toolchain.link_static_commands(object_file_paths, out).each do |cmd|
-        return false unless run_command(cmd, env:, working_dir:)
-      end
-      true
-    end
-
-    # Links one or more object files into a shared library.
-    # Skips linking if +output_path+ already exists and is newer than all
-    # +object_file_paths+. Pass <tt>force: true</tt> to always re-link.
-    # Relative +output_path+ values are resolved under +output_dir+.
-    #
-    # @param object_file_paths [Array<String>] paths to the object files to link
-    # @param output_path       [String] path for the resulting shared library
-    # @param force             [Boolean] when true, always link even if output is up-to-date
-    # @param env               [Hash] environment variables to set for the subprocess
-    # @param working_dir       [String] working directory for the subprocess (default: ".")
-    # @return [Boolean] true if linking succeeded (or was skipped), false otherwise
-    def link_shared(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
-      out = resolve_output(output_path)
-      return true if !force && up_to_date?(out, object_file_paths)
-
-      run_command(@toolchain.link_shared_command(object_file_paths, out), env:, working_dir:)
     end
 
     private

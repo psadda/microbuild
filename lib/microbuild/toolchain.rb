@@ -8,15 +8,12 @@ module Microbuild
   # Subclasses set their own command attributes in +initialize+ by calling
   # +command_available?+ to probe the system, then implement the
   # toolchain-specific flag and command building methods.
-  #   type   – symbolic name (:clang, :gcc, :msvc)
-  #   c      – command used to compile C source files
-  #   cxx    – command used to compile C++ source files
-  #   ld     – command used to link executables and shared libraries
-  #   ar     – command used to create static libraries (nil if not found)
-  #   ranlib – command used to index static libraries (nil if not found)
+  #   type – symbolic name (:clang, :gcc, :msvc)
+  #   c    – command used to compile C source files
+  #   cxx  – command used to compile C++ source files
   class Toolchain
 
-    attr_reader :type, :c, :cxx, :ld, :ar, :ranlib
+    attr_reader :type, :c, :cxx
 
     # Returns true if this toolchain's primary compiler is present in PATH.
     def available?
@@ -39,25 +36,11 @@ module Microbuild
       raise NotImplementedError, "#{self.class}#flags not implemented"
     end
 
-    # Returns the full compile command for the given inputs.
-    def compile_command(source, output, flags, include_paths, definitions)
-      raise NotImplementedError, "#{self.class}#compile_command not implemented"
-    end
-
-    # Returns the full link-executable command for the given inputs.
-    def link_executable_command(object_files, output)
-      raise NotImplementedError, "#{self.class}#link_executable_command not implemented"
-    end
-
-    # Returns the full link-shared-library command for the given inputs.
-    def link_shared_command(object_files, output)
-      raise NotImplementedError, "#{self.class}#link_shared_command not implemented"
-    end
-
-    # Returns an array of commands to create a static archive.
-    # Each element is a command array suitable for Open3.capture3.
-    def link_static_commands(object_files, output)
-      raise NotImplementedError, "#{self.class}#link_static_commands not implemented"
+    # Returns the full command array for the given inputs, output, and flags.
+    # The output mode (object files, shared library, static library, or
+    # executable) is determined by the translated flags.
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+      raise NotImplementedError, "#{self.class}#command not implemented"
     end
 
     private
@@ -73,33 +56,19 @@ module Microbuild
 
     def initialize
       super
-      @type   = :gcc
-      @c      = "gcc"
-      @cxx    = "g++"
-      @ld     = "g++"
-      @ar     = "ar"     if command_available?("ar")
-      @ranlib = "ranlib" if command_available?("ranlib")
+      @type = :gcc
+      @c    = "gcc"
+      @cxx  = "g++"
     end
 
-    def compile_command(source, output, flags, include_paths, definitions)
-      cc = c_file?(source) ? c : cxx
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+      cc = (input_files.length == 1 && c_file?(input_files.first)) ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
-      [cc, *flags, *inc_flags, *def_flags, "-c", source, "-o", output]
-    end
-
-    def link_executable_command(object_files, output)
-      [ld, *object_files, "-o", output]
-    end
-
-    def link_shared_command(object_files, output)
-      [ld, "-shared", *object_files, "-o", output]
-    end
-
-    def link_static_commands(object_files, output)
-      cmds = [[ar, "rcs", output, *object_files]]
-      cmds << [ranlib, output] if ranlib
-      cmds
+      link_mode = !flags.include?("-c")
+      lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
+      lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
+      [cc, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
     end
 
     GNU_FLAGS = {
@@ -130,7 +99,10 @@ module Microbuild
       msan:          ["-fsanitize=memory"],
       no_rtti:       ["-fno-rtti"],
       no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
-      pic:           ["-fPIC"]
+      pic:           ["-fPIC"],
+      objects:       ["-c"],
+      shared:        ["-shared"],
+      static:        ["-r", "-nostdlib"]
     }.freeze
 
     def flags
@@ -144,10 +116,9 @@ module Microbuild
 
     def initialize
       super
-      @type   = :clang
-      @c      = "clang"
-      @cxx    = "clang++"
-      @ld     = "clang++"
+      @type = :clang
+      @c    = "clang"
+      @cxx  = "clang++"
     end
 
     CLANG_FLAGS = GNU_FLAGS.merge(lto: ["-flto=thin"]).freeze
@@ -172,27 +143,22 @@ module Microbuild
       @type = :msvc
       @c    = cl_command
       @cxx  = cl_command
-      @ld   = "link"
-      @ar   = "lib"
       setup_msvc_environment(cl_command)
     end
 
-    def compile_command(source, output, flags, include_paths, definitions)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map { |d| "/D#{d}" }
-      [c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
-    end
 
-    def link_executable_command(object_files, output)
-      [ld, *object_files, "/OUT:#{output}"]
-    end
-
-    def link_shared_command(object_files, output)
-      [ld, "/DLL", *object_files, "/OUT:#{output}"]
-    end
-
-    def link_static_commands(object_files, output)
-      [[ar, "/OUT:#{output}", *object_files]]
+      if flags.include?("/c")
+        [c, *flags, *inc_flags, *def_flags, *input_files, "/Fo#{output}"]
+      else
+        lib_flags      = libs.map { |l| "#{l}.lib" }
+        lib_path_flags = linker_include_dirs.map { |p| "/LIBPATH:#{p}" }
+        cmd = [c, *flags, *inc_flags, *def_flags, *input_files, *lib_flags, "/Fe#{output}"]
+        cmd += ["/link", *lib_path_flags] unless lib_path_flags.empty?
+        cmd
+      end
     end
 
     MSVC_FLAGS = {
@@ -223,7 +189,10 @@ module Microbuild
       msan:          [],
       no_rtti:       ["/GR-"],
       no_exceptions: ["/EHs-", "/EHc-"],
-      pic:           []
+      pic:           [],
+      objects:       ["/c"],
+      shared:        ["/LD"],
+      static:        ["/c"]
     }.freeze
 
     def flags

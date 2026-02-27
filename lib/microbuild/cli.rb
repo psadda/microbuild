@@ -92,7 +92,7 @@ module Microbuild
       when "link"
         link_type, options, objects = parse_link_args(argv)
         driver = build_driver
-        link_objects(driver, link_type, objects, options[:output])
+        link_objects(driver, link_type, objects, options[:output], options[:libs], options[:linker_include_dirs])
       else
         warn "Usage: microbuild <c|cxx|link> [options] <files...>"
         exit 1
@@ -157,9 +157,15 @@ module Microbuild
         exit 1
       end
 
-      options = { output: nil }
+      options = { output: nil, libs: [], linker_include_dirs: [] }
       parser = OptionParser.new do |opts|
         opts.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
+        opts.on("-l LIB", "--lib LIB", "Link against library LIB") do |v|
+          options[:libs] << v
+        end
+        opts.on("-L DIR", "--libdir DIR", "Add linker library search path") do |v|
+          options[:linker_include_dirs] << v
+        end
       end
       objects = parser.parse(argv)
 
@@ -175,9 +181,9 @@ module Microbuild
     def compile_sources(driver, sources, options)
       sources.each do |source|
         output = options[:output] || default_object_path(source)
-        success = driver.compile(
+        success = driver.invoke(
           source, output,
-          flags:         options[:flags],
+          flags:         options[:flags] + [:objects],
           xflags:        options[:xflags],
           include_paths: options[:includes],
           definitions:   options[:defines]
@@ -186,12 +192,13 @@ module Microbuild
       end
     end
 
-    def link_objects(driver, link_type, objects, output)
-      success = case link_type
-      when "executable" then driver.link_executable(objects, output)
-      when "static"     then driver.link_static(objects, output)
-      when "shared"     then driver.link_shared(objects, output)
+    def link_objects(driver, link_type, objects, output, libs = [], linker_include_dirs = [])
+      flags = case link_type
+      when "executable" then []
+      when "static"     then [:static]
+      when "shared"     then [:shared]
       end
+      success = driver.invoke(objects, output, flags:, libs:, linker_include_dirs:)
       exit 1 unless success
     end
 
