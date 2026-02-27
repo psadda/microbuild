@@ -108,6 +108,7 @@ module Microbuild
     def gnu_like_flags
       {
         o0:            ["-O0"],
+        o1:            ["-O1"],
         o2:            ["-O2"],
         o3:            ["-O3"],
         avx:           ["-mavx"],
@@ -193,6 +194,7 @@ module Microbuild
     def flags
       UniversalFlags.new(
         o0:            ["/Od"],
+        o1:            ["/O1"],
         o2:            ["/O2"],
         o3:            ["/O2", "/Ob3"],
         avx:           ["/arch:AVX"],

@@ -6,6 +6,7 @@ module Microbuild
   #
   # Attributes:
   #   o0           – disable optimisation
+  #   o1           – minimal optimisation
   #   o2           – moderate optimisation
   #   o3           – aggressive optimisation
   #   avx          – enable AVX instructions
@@ -32,7 +33,7 @@ module Microbuild
   class UniversalFlags
 
     ATTRIBUTES = %i[
-      o0 o2 o3
+      o0 o1 o2 o3
       avx avx2 avx512
       debug lto
       warn_all warn_error
