@@ -1,3 +1,3 @@
 # microbuild
 
-A small Ruby scripting system for building C and C++ applications, and my personal experiment in vibecoding.
+A small C/C++ compiler driver written in Ruby, and my personal experiment in vibecoding.
