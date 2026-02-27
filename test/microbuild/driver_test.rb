@@ -27,18 +27,6 @@ class DriverTest < Minitest::Test
     assert_kind_of Microbuild::Toolchain, builder.toolchain
   end
 
-  def test_compiler_info_has_ar_field
-    builder = Microbuild::Driver.new
-    # ar is expected to be present on any standard CI system
-    refute_nil builder.toolchain.ar
-  end
-
-  def test_compiler_info_ranlib_is_string_or_nil
-    builder = Microbuild::Driver.new
-
-    assert(builder.toolchain.ranlib.nil? || builder.toolchain.ranlib.is_a?(String))
-  end
-
   def test_raises_when_no_compiler_found
     # Use an anonymous subclass with no toolchain classes to probe.
     klass = Class.new(Microbuild::Driver) do
@@ -60,14 +48,14 @@ class DriverTest < Minitest::Test
     assert_empty builder.log
   end
 
-  def test_log_accumulates_entries_after_compile
+  def test_log_accumulates_entries_after_invoke
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
+      builder.invoke(src, obj, flags: [:objects])
 
       assert_equal 1, builder.log.size
       entry = builder.log.first
@@ -86,8 +74,8 @@ class DriverTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
-      builder.link_executable([obj], exe)
+      builder.invoke(src, obj, flags: [:objects])
+      builder.invoke([obj], exe)
 
       assert_equal 2, builder.log.size
     end
@@ -104,7 +92,7 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
+      builder.invoke(src, obj, flags: [:objects])
 
       assert_kind_of String, sink.string
     end
@@ -118,7 +106,7 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "broken.o")
       File.write(src, "this is not valid C code {\n")
 
-      builder.compile(src, obj)
+      builder.invoke(src, obj, flags: [:objects])
 
       refute_empty sink.string, "stderr sink should have received error output"
     end
@@ -138,42 +126,42 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      assert builder.compile(src, obj), "expected compile to succeed"
+      assert builder.invoke(src, obj, flags: [:objects]), "expected invoke to succeed"
     end
   end
 
   # ---------------------------------------------------------------------------
-  # #compile
+  # #invoke – compile to object files (objects flag)
   # ---------------------------------------------------------------------------
-  def test_compile_c_source_returns_true_and_creates_object_file
+  def test_invoke_objects_c_source_returns_true_and_creates_object_file
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+      result = builder.invoke(src, obj, flags: [:objects], include_paths: [], definitions: [])
 
-      assert result, "expected compile to return true"
+      assert result, "expected invoke to return true"
       assert_path_exists obj, "expected object file to be created"
     end
   end
 
-  def test_compile_cxx_source_returns_true_and_creates_object_file
+  def test_invoke_objects_cxx_source_returns_true_and_creates_object_file
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.cpp")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main() { return 0; }\n")
 
-      result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+      result = builder.invoke(src, obj, flags: [:objects], include_paths: [], definitions: [])
 
-      assert result, "expected compile to return true"
+      assert result, "expected invoke to return true"
       assert_path_exists obj, "expected object file to be created"
     end
   end
 
-  def test_compile_with_include_paths_and_definitions
+  def test_invoke_objects_with_include_paths_and_definitions
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       inc_dir = File.join(dir, "include")
@@ -184,35 +172,35 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "main.o")
       File.write(src, "#include <config.h>\nint main(void) { return ANSWER - ANSWER; }\n")
 
-      result = builder.compile(
+      result = builder.invoke(
         src, obj,
-        flags:         [],
+        flags:         [:objects],
         include_paths: [inc_dir],
         definitions:   ["UNUSED=1"]
       )
 
-      assert result, "expected compile to return true"
+      assert result, "expected invoke to return true"
       assert_path_exists obj, "expected object file to be created"
     end
   end
 
-  def test_compile_broken_source_returns_false
+  def test_invoke_objects_broken_source_returns_false
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "broken.c")
       obj = File.join(dir, "broken.o")
       File.write(src, "this is not valid C code {\n")
 
-      result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+      result = builder.invoke(src, obj, flags: [:objects], include_paths: [], definitions: [])
 
-      refute result, "expected compile to return false for invalid source"
+      refute result, "expected invoke to return false for invalid source"
     end
   end
 
   # ---------------------------------------------------------------------------
-  # #link_executable
+  # #invoke – link to executable (no mode flag)
   # ---------------------------------------------------------------------------
-  def test_link_executable_creates_executable
+  def test_invoke_executable_creates_executable
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
@@ -220,66 +208,27 @@ class DriverTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
-      result = builder.link_executable([obj], exe)
+      builder.invoke(src, obj, flags: [:objects])
+      result = builder.invoke([obj], exe)
 
-      assert result, "expected link_executable to return true"
+      assert result, "expected invoke to return true"
       assert_path_exists exe, "expected executable to be created"
     end
   end
 
-  def test_link_executable_missing_object_returns_false
+  def test_invoke_executable_missing_object_returns_false
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
-      result = builder.link_executable([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
+      result = builder.invoke([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
 
-      refute result, "expected link_executable to return false for missing object file"
+      refute result, "expected invoke to return false for missing object file"
     end
   end
 
   # ---------------------------------------------------------------------------
-  # #link_static
+  # #invoke – shared library (shared flag)
   # ---------------------------------------------------------------------------
-  def test_link_static_creates_archive
-    builder = Microbuild::Driver.new
-    skip("ar not available") unless builder.toolchain.ar
-
-    Dir.mktmpdir do |dir|
-      src = File.join(dir, "util.c")
-      obj = File.join(dir, "util.o")
-      lib = File.join(dir, "libutil.a")
-      File.write(src, "int add(int a, int b) { return a + b; }\n")
-
-      builder.compile(src, obj)
-      result = builder.link_static([obj], lib)
-
-      assert result, "expected link_static to return true"
-      assert_path_exists lib, "expected static library to be created"
-    end
-  end
-
-  def test_link_static_returns_false_when_ar_unavailable
-    # Subclass whose toolchain reports no archiver available.
-    klass = Class.new(Microbuild::Driver) do
-      private
-
-      def toolchain_classes
-        [Class.new(Microbuild::GnuToolchain) do
-          def command_available?(cmd)
-            cmd != "ar"
-          end
-        end]
-      end
-    end
-    builder = klass.new
-
-    refute builder.link_static([], "/tmp/fake.a"), "expected false when ar is unavailable"
-  end
-
-  # ---------------------------------------------------------------------------
-  # #link_shared
-  # ---------------------------------------------------------------------------
-  def test_link_shared_creates_shared_library
+  def test_invoke_shared_creates_shared_library
     builder = Microbuild::Driver.new
     skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
@@ -289,10 +238,10 @@ class DriverTest < Minitest::Test
       lib = File.join(dir, "libutil.so")
       File.write(src, "int add(int a, int b) { return a + b; }\n")
 
-      builder.compile(src, obj, flags: ["-fPIC"])
-      result = builder.link_shared([obj], lib)
+      builder.invoke(src, obj, flags: [:objects, :pic])
+      result = builder.invoke([obj], lib, flags: [:shared])
 
-      assert result, "expected link_shared to return true"
+      assert result, "expected invoke to return true"
       assert_path_exists lib, "expected shared library to be created"
     end
   end
@@ -300,14 +249,14 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   # incremental build: up-to-date skipping and force: override
   # ---------------------------------------------------------------------------
-  def test_compile_skips_when_output_is_up_to_date
+  def test_invoke_objects_skips_when_output_is_up_to_date
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
+      builder.invoke(src, obj, flags: [:objects])
 
       assert_equal 1, builder.log.size
 
@@ -315,33 +264,33 @@ class DriverTest < Minitest::Test
       past = File.mtime(obj) - 1
       File.utime(past, past, src)
 
-      result = builder.compile(src, obj)
+      result = builder.invoke(src, obj, flags: [:objects])
 
-      assert result, "expected skipped compile to return true"
+      assert result, "expected skipped invoke to return true"
       assert_equal 1, builder.log.size, "log should not grow when step is skipped"
     end
   end
 
-  def test_compile_force_overrides_up_to_date
+  def test_invoke_objects_force_overrides_up_to_date
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
+      builder.invoke(src, obj, flags: [:objects])
 
       past = File.mtime(obj) - 1
       File.utime(past, past, src)
 
-      result = builder.compile(src, obj, force: true)
+      result = builder.invoke(src, obj, flags: [:objects], force: true)
 
-      assert result, "expected forced compile to return true"
+      assert result, "expected forced invoke to return true"
       assert_equal 2, builder.log.size, "log should grow when force: true"
     end
   end
 
-  def test_link_executable_skips_when_output_is_up_to_date
+  def test_invoke_executable_skips_when_output_is_up_to_date
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
@@ -349,8 +298,8 @@ class DriverTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
-      builder.link_executable([obj], exe)
+      builder.invoke(src, obj, flags: [:objects])
+      builder.invoke([obj], exe)
 
       assert_equal 2, builder.log.size
 
@@ -358,14 +307,14 @@ class DriverTest < Minitest::Test
       past = File.mtime(exe) - 1
       File.utime(past, past, obj)
 
-      result = builder.link_executable([obj], exe)
+      result = builder.invoke([obj], exe)
 
-      assert result, "expected skipped link_executable to return true"
+      assert result, "expected skipped invoke to return true"
       assert_equal 2, builder.log.size, "log should not grow when step is skipped"
     end
   end
 
-  def test_link_executable_force_overrides_up_to_date
+  def test_invoke_executable_force_overrides_up_to_date
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
@@ -373,44 +322,20 @@ class DriverTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
-      builder.link_executable([obj], exe)
+      builder.invoke(src, obj, flags: [:objects])
+      builder.invoke([obj], exe)
 
       past = File.mtime(exe) - 1
       File.utime(past, past, obj)
 
-      result = builder.link_executable([obj], exe, force: true)
+      result = builder.invoke([obj], exe, force: true)
 
-      assert result, "expected forced link_executable to return true"
+      assert result, "expected forced invoke to return true"
       assert_equal 3, builder.log.size, "log should grow when force: true"
     end
   end
 
-  def test_link_static_skips_when_output_is_up_to_date
-    builder = Microbuild::Driver.new
-    skip("ar not available") unless builder.toolchain.ar
-
-    Dir.mktmpdir do |dir|
-      src = File.join(dir, "util.c")
-      obj = File.join(dir, "util.o")
-      lib = File.join(dir, "libutil.a")
-      File.write(src, "int add(int a, int b) { return a + b; }\n")
-
-      builder.compile(src, obj)
-      builder.link_static([obj], lib)
-      log_size = builder.log.size
-
-      past = File.mtime(lib) - 1
-      File.utime(past, past, obj)
-
-      result = builder.link_static([obj], lib)
-
-      assert result, "expected skipped link_static to return true"
-      assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
-    end
-  end
-
-  def test_link_shared_skips_when_output_is_up_to_date
+  def test_invoke_shared_skips_when_output_is_up_to_date
     builder = Microbuild::Driver.new
     skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
@@ -420,16 +345,16 @@ class DriverTest < Minitest::Test
       lib = File.join(dir, "libutil.so")
       File.write(src, "int add(int a, int b) { return a + b; }\n")
 
-      builder.compile(src, obj, flags: ["-fPIC"])
-      builder.link_shared([obj], lib)
+      builder.invoke(src, obj, flags: [:objects, :pic])
+      builder.invoke([obj], lib, flags: [:shared])
       log_size = builder.log.size
 
       past = File.mtime(lib) - 1
       File.utime(past, past, obj)
 
-      result = builder.link_shared([obj], lib)
+      result = builder.invoke([obj], lib, flags: [:shared])
 
-      assert result, "expected skipped link_shared to return true"
+      assert result, "expected skipped invoke to return true"
       assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
     end
   end
@@ -445,9 +370,9 @@ class DriverTest < Minitest::Test
       FileUtils.mkdir_p(build_dir)
 
       builder = Microbuild::Driver.new(output_dir: build_dir)
-      result = builder.compile(src, "hello.o")
+      result = builder.invoke(src, "hello.o", flags: [:objects])
 
-      assert result, "expected compile to succeed"
+      assert result, "expected invoke to succeed"
       assert_path_exists File.join(build_dir, "hello.o"), "object should be in output_dir"
     end
   end
@@ -459,9 +384,9 @@ class DriverTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       builder = Microbuild::Driver.new(output_dir: "/nonexistent_build_dir")
-      result = builder.compile(src, obj)
+      result = builder.invoke(src, obj, flags: [:objects])
 
-      assert result, "expected compile to succeed with absolute output path"
+      assert result, "expected invoke to succeed with absolute output path"
       assert_path_exists obj, "object should be at the absolute path"
     end
   end
@@ -475,20 +400,20 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   # env: and working_dir: per-invocation options
   # ---------------------------------------------------------------------------
-  def test_compile_accepts_env_and_working_dir
+  def test_invoke_accepts_env_and_working_dir
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      result = builder.compile(src, obj, env: {}, working_dir: dir)
+      result = builder.invoke(src, obj, flags: [:objects], env: {}, working_dir: dir)
 
-      assert result, "expected compile to succeed with env: and working_dir:"
+      assert result, "expected invoke to succeed with env: and working_dir:"
     end
   end
 
-  def test_link_executable_accepts_env_and_working_dir
+  def test_invoke_executable_accepts_env_and_working_dir
     builder = Microbuild::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
@@ -496,10 +421,10 @@ class DriverTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj)
-      result = builder.link_executable([obj], exe, env: {}, working_dir: dir)
+      builder.invoke(src, obj, flags: [:objects])
+      result = builder.invoke([obj], exe, env: {}, working_dir: dir)
 
-      assert result, "expected link_executable to succeed with env: and working_dir:"
+      assert result, "expected invoke to succeed with env: and working_dir:"
     end
   end
 
@@ -511,9 +436,9 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
-      result = builder.compile(src, obj, env: { "MY_BUILD_FLAG" => "1" })
+      result = builder.invoke(src, obj, flags: [:objects], env: { "MY_BUILD_FLAG" => "1" })
 
-      assert result, "expected compile to succeed when env: contains custom vars"
+      assert result, "expected invoke to succeed when env: contains custom vars"
     end
   end
 
@@ -525,10 +450,10 @@ class DriverTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       # Run with working_dir set to the tmp dir; absolute paths still resolve.
-      result = builder.compile(src, obj, working_dir: dir)
+      result = builder.invoke(src, obj, flags: [:objects], working_dir: dir)
 
-      assert result, "expected compile to succeed with working_dir set"
-      assert_path_exists obj, "object file should exist after compile with working_dir"
+      assert result, "expected invoke to succeed with working_dir set"
+      assert_path_exists obj, "object file should exist after invoke with working_dir"
     end
   end
 

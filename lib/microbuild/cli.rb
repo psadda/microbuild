@@ -175,9 +175,9 @@ module Microbuild
     def compile_sources(driver, sources, options)
       sources.each do |source|
         output = options[:output] || default_object_path(source)
-        success = driver.compile(
+        success = driver.invoke(
           source, output,
-          flags:         options[:flags],
+          flags:         options[:flags] + [:objects],
           xflags:        options[:xflags],
           include_paths: options[:includes],
           definitions:   options[:defines]
@@ -187,11 +187,12 @@ module Microbuild
     end
 
     def link_objects(driver, link_type, objects, output)
-      success = case link_type
-      when "executable" then driver.link_executable(objects, output)
-      when "static"     then driver.link_static(objects, output)
-      when "shared"     then driver.link_shared(objects, output)
+      flags = case link_type
+      when "executable" then []
+      when "static"     then [:static]
+      when "shared"     then [:shared]
       end
+      success = driver.invoke(objects, output, flags:)
       exit 1 unless success
     end
 

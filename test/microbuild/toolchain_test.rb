@@ -20,7 +20,7 @@ class MsvcToolchainTest < Minitest::Test
   def stub_msvc_class(cl_on_path: false, &block)
     klass = Class.new(Microbuild::MsvcToolchain) do
       define_method(:command_available?) do |cmd|
-        cl_on_path && %w[cl link lib].include?(cmd)
+        cl_on_path && cmd == "cl"
       end
 
       def run_vswhere(*)   = nil
@@ -42,7 +42,6 @@ class MsvcToolchainTest < Minitest::Test
 
     assert_equal "cl", tc.c
     assert_equal "cl", tc.cxx
-    assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_cl_is_on_path
@@ -176,7 +175,7 @@ class MsvcToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::MsvcToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && %w[cl link lib].include?(cmd)
+          setup_done && cmd == "cl"
         end
         define_method(:run_vswhere) { |*_args| devenv }
         define_method(:run_vcvarsall) do |_path|
@@ -208,7 +207,7 @@ class ClangClToolchainTest < Minitest::Test
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
     klass = Class.new(Microbuild::ClangClToolchain) do
       define_method(:command_available?) do |cmd|
-        clang_cl_on_path && %w[clang-cl link lib].include?(cmd)
+        clang_cl_on_path && cmd == "clang-cl"
       end
 
       def run_vswhere(*)   = nil
@@ -233,12 +232,6 @@ class ClangClToolchainTest < Minitest::Test
 
     assert_equal "clang-cl", tc.c
     assert_equal "clang-cl", tc.cxx
-  end
-
-  def test_linker_is_link
-    tc = stub_clang_cl_class(clang_cl_on_path: true).new
-
-    assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_clang_cl_is_on_path
@@ -281,7 +274,7 @@ class ClangClToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::ClangClToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && %w[clang-cl link lib].include?(cmd)
+          setup_done && cmd == "clang-cl"
         end
         define_method(:run_vswhere) { |*_args| devenv }
         define_method(:run_vcvarsall) do |_path|
