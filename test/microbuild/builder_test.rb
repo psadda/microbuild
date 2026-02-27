@@ -14,23 +14,23 @@ class BuilderTest < Minitest::Test
 
   def test_compiler_type_is_known
     builder = Microbuild::Builder.new
-    assert_includes [:clang, :gcc, :msvc], builder.compiler.type
+    assert_includes [:clang, :gcc, :msvc], builder.toolchain.type
   end
 
   def test_compiler_is_compiler_info_struct
     builder = Microbuild::Builder.new
-    assert_instance_of Microbuild::CompilerInfo, builder.compiler
+    assert_kind_of Microbuild::Toolchain, builder.toolchain
   end
 
   def test_compiler_info_has_ar_field
     builder = Microbuild::Builder.new
     # ar is expected to be present on any standard CI system
-    refute_nil builder.compiler.ar
+    refute_nil builder.toolchain.ar
   end
 
   def test_compiler_info_ranlib_is_string_or_nil
     builder = Microbuild::Builder.new
-    assert(builder.compiler.ranlib.nil? || builder.compiler.ranlib.is_a?(String))
+    assert(builder.toolchain.ranlib.nil? || builder.toolchain.ranlib.is_a?(String))
   end
 
   def test_raises_when_no_compiler_found
@@ -223,7 +223,7 @@ class BuilderTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_link_static_creates_archive
     builder = Microbuild::Builder.new
-    skip("ar not available") unless builder.compiler.ar
+    skip("ar not available") unless builder.toolchain.ar
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -239,12 +239,12 @@ class BuilderTest < Minitest::Test
   end
 
   def test_link_static_returns_false_when_ar_unavailable
-    # Subclass whose compiler reports no archiver available.
+    # Subclass whose toolchain reports no archiver available.
     klass = Class.new(Microbuild::Builder) do
       private
 
-      def detect_compiler!
-        Microbuild::CompilerInfo.new(:gcc, "gcc", "g++", "g++", nil, nil)
+      def detect_toolchain!
+        Microbuild::GnuToolchain.new(:gcc, "gcc", "g++", "g++", nil, nil)
       end
     end
     builder = klass.new
@@ -256,7 +256,7 @@ class BuilderTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_link_shared_creates_shared_library
     builder = Microbuild::Builder.new
-    skip("MSVC shared linking not tested here") if builder.compiler.type == :msvc
+    skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -356,7 +356,7 @@ class BuilderTest < Minitest::Test
 
   def test_link_static_skips_when_output_is_up_to_date
     builder = Microbuild::Builder.new
-    skip("ar not available") unless builder.compiler.ar
+    skip("ar not available") unless builder.toolchain.ar
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -379,7 +379,7 @@ class BuilderTest < Minitest::Test
 
   def test_link_shared_skips_when_output_is_up_to_date
     builder = Microbuild::Builder.new
-    skip("MSVC shared linking not tested here") if builder.compiler.type == :msvc
+    skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")

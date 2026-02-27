@@ -6,28 +6,19 @@ module Microbuild
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end
 
-  # Holds information about a detected compiler toolchain.
-  #   type   – symbolic name (:clang, :gcc, :msvc)
-  #   c      – command used to compile C source files
-  #   cxx    – command used to compile C++ source files
-  #   ld     – command used to link executables and shared libraries
-  #   ar     – command used to create static libraries (nil if not found)
-  #   ranlib – command used to index static libraries (nil if not found)
-  CompilerInfo = Struct.new(:type, :c, :cxx, :ld, :ar, :ranlib)
-
   # Builder wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
 
     # Ordered list of compiler candidates to probe.
     TOOLCHAIN_CANDIDATES = [
-      { type: :clang, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
-      { type: :gcc,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
-      { type: :msvc,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
+      { type: :clang, klass: ClangToolchain, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
+      { type: :gcc,   klass: GnuToolchain,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
+      { type: :msvc,  klass: MsvcToolchain,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
     ].freeze
 
-    # The detected compiler information (a CompilerInfo struct).
-    attr_reader :compiler
+    # The detected toolchain (a Toolchain subclass instance).
+    attr_reader :toolchain
 
     # Accumulated log entries from all compile/link invocations.
     # Each entry is a Hash with :command, :stdout, and :stderr keys.
@@ -51,8 +42,7 @@ module Microbuild
       @stderr_sink = stderr_sink
       @output_dir = output_dir
       @log = []
-      @compiler = detect_compiler!
-      @toolchain_impl = create_toolchain(@compiler)
+      @toolchain = detect_toolchain!
     end
 
     # Compiles a single source file into an object file.
@@ -73,7 +63,7 @@ module Microbuild
                 force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
-      cmd = @toolchain_impl.compile_command(source_file_path, out, flags, include_paths, definitions)
+      cmd = @toolchain.compile_command(source_file_path, out, flags, include_paths, definitions)
       run_command(cmd, env: env, working_dir: working_dir)
     end
 
@@ -91,7 +81,7 @@ module Microbuild
     def link_executable(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(@toolchain_impl.link_executable_command(object_file_paths, out), env: env, working_dir: working_dir)
+      run_command(@toolchain.link_executable_command(object_file_paths, out), env: env, working_dir: working_dir)
     end
 
     # Archives one or more object files into a static library.
@@ -108,11 +98,11 @@ module Microbuild
     # @param working_dir       [String] working directory for the subprocess (default: ".")
     # @return [Boolean] true if archiving succeeded (or was skipped), false otherwise
     def link_static(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
-      return false unless compiler.ar
+      return false unless toolchain.ar
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
 
-      @toolchain_impl.link_static_commands(object_file_paths, out).each do |cmd|
+      @toolchain.link_static_commands(object_file_paths, out).each do |cmd|
         return false unless run_command(cmd, env: env, working_dir: working_dir)
       end
       true
@@ -132,28 +122,20 @@ module Microbuild
     def link_shared(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(@toolchain_impl.link_shared_command(object_file_paths, out), env: env, working_dir: working_dir)
+      run_command(@toolchain.link_shared_command(object_file_paths, out), env: env, working_dir: working_dir)
     end
 
     private
 
-    def detect_compiler!
+    def detect_toolchain!
       TOOLCHAIN_CANDIDATES.each do |candidate|
         next unless command_available?(candidate[:c])
         ar     = candidate[:ar]     if command_available?(candidate[:ar])
         ranlib = candidate[:ranlib] if command_available?(candidate[:ranlib])
-        return CompilerInfo.new(candidate[:type], candidate[:c], candidate[:cxx],
-                                candidate[:ld], ar, ranlib)
+        return candidate[:klass].new(candidate[:type], candidate[:c], candidate[:cxx],
+                                     candidate[:ld], ar, ranlib)
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
-    end
-
-    def create_toolchain(compiler_info)
-      case compiler_info.type
-      when :msvc  then MsvcToolchain.new(compiler_info)
-      when :clang then ClangToolchain.new(compiler_info)
-      else             GnuToolchain.new(compiler_info)
-      end
     end
 
     # Returns true if +command+ is present in PATH, false otherwise.
