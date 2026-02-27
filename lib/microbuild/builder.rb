@@ -10,12 +10,8 @@ module Microbuild
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
 
-    # Ordered list of compiler candidates to probe.
-    TOOLCHAIN_CANDIDATES = [
-      { type: :clang, klass: ClangToolchain, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
-      { type: :gcc,   klass: GnuToolchain,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
-      { type: :msvc,  klass: MsvcToolchain,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
-    ].freeze
+    # Ordered list of toolchain classes to probe, in priority order.
+    TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
 
     # The detected toolchain (a Toolchain subclass instance).
     attr_reader :toolchain
@@ -128,24 +124,15 @@ module Microbuild
     private
 
     def detect_toolchain!
-      TOOLCHAIN_CANDIDATES.each do |candidate|
-        next unless command_available?(candidate[:c])
-        ar     = candidate[:ar]     if command_available?(candidate[:ar])
-        ranlib = candidate[:ranlib] if command_available?(candidate[:ranlib])
-        return candidate[:klass].new(candidate[:type], candidate[:c], candidate[:cxx],
-                                     candidate[:ld], ar, ranlib)
+      toolchain_classes.each do |klass|
+        tc = klass.new
+        return tc if tc.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
     end
 
-    # Returns true if +command+ is present in PATH, false otherwise.
-    # Intentionally ignores the exit status – only ENOENT (not found) matters.
-    def command_available?(command)
-      return false if command.nil?
-      Open3.capture3(command, "--version")
-      true
-    rescue Errno::ENOENT
-      false
+    def toolchain_classes
+      TOOLCHAIN_CLASSES
     end
 
     def run_command(cmd, env: {}, working_dir: ".")

@@ -34,12 +34,12 @@ class BuilderTest < Minitest::Test
   end
 
   def test_raises_when_no_compiler_found
-    # Use an anonymous subclass that reports every command as unavailable.
+    # Use an anonymous subclass with no toolchain classes to probe.
     klass = Class.new(Microbuild::Builder) do
       private
 
-      def command_available?(_cmd)
-        false
+      def toolchain_classes
+        []
       end
     end
     assert_raises(Microbuild::CompilerNotFoundError) { klass.new }
@@ -243,8 +243,12 @@ class BuilderTest < Minitest::Test
     klass = Class.new(Microbuild::Builder) do
       private
 
-      def detect_toolchain!
-        Microbuild::GnuToolchain.new(:gcc, "gcc", "g++", "g++", nil, nil)
+      def toolchain_classes
+        [Class.new(Microbuild::GnuToolchain) do
+          def command_available?(cmd)
+            cmd == "ar" ? false : true
+          end
+        end]
       end
     end
     builder = klass.new

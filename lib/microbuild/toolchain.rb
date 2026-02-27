@@ -1,8 +1,11 @@
+require "open3"
+
 module Microbuild
 
   # Base class for compiler toolchains.
-  # Carries the detected compiler command names and implements
-  # toolchain-specific flag and command building in subclasses.
+  # Subclasses set their own command attributes in +initialize+ by calling
+  # +command_available?+ to probe the system, then implement the
+  # toolchain-specific flag and command building methods.
   #   type   – symbolic name (:clang, :gcc, :msvc)
   #   c      – command used to compile C source files
   #   cxx    – command used to compile C++ source files
@@ -13,13 +16,19 @@ module Microbuild
 
     attr_reader :type, :c, :cxx, :ld, :ar, :ranlib
 
-    def initialize(type, c, cxx, ld, ar, ranlib)
-      @type   = type
-      @c      = c
-      @cxx    = cxx
-      @ld     = ld
-      @ar     = ar
-      @ranlib = ranlib
+    # Returns true if this toolchain's primary compiler is present in PATH.
+    def available?
+      command_available?(c)
+    end
+
+    # Returns true if +command+ is present in PATH, false otherwise.
+    # Intentionally ignores the exit status – only ENOENT (not found) matters.
+    def command_available?(command)
+      return false if command.nil?
+      Open3.capture3(command, "--version")
+      true
+    rescue Errno::ENOENT
+      false
     end
 
     # Returns the full compile command for the given inputs.
@@ -54,6 +63,15 @@ module Microbuild
   # GNU-compatible toolchain (gcc).
   class GnuToolchain < Toolchain
 
+    def initialize
+      @type   = :gcc
+      @c      = "gcc"
+      @cxx    = "g++"
+      @ld     = "g++"
+      @ar     = "ar"     if command_available?("ar")
+      @ranlib = "ranlib" if command_available?("ranlib")
+    end
+
     def compile_command(source, output, flags, include_paths, definitions)
       cc = c_file?(source) ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
@@ -78,10 +96,29 @@ module Microbuild
   end
 
   # Clang toolchain – identical command structure to GNU.
-  class ClangToolchain < GnuToolchain; end
+  class ClangToolchain < GnuToolchain
+
+    def initialize
+      @type   = :clang
+      @c      = "clang"
+      @cxx    = "clang++"
+      @ld     = "clang++"
+      @ar     = "ar"     if command_available?("ar")
+      @ranlib = "ranlib" if command_available?("ranlib")
+    end
+
+  end
 
   # Microsoft Visual C++ toolchain.
   class MsvcToolchain < Toolchain
+
+    def initialize
+      @type = :msvc
+      @c    = "cl"
+      @cxx  = "cl"
+      @ld   = "link"
+      @ar   = "lib" if command_available?("lib")
+    end
 
     def compile_command(source, output, flags, include_paths, definitions)
       inc_flags = include_paths.map { |p| "/I#{p}" }
