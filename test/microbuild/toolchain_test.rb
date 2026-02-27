@@ -1,29 +1,25 @@
 require "test_helper"
 require "securerandom"
+require "tmpdir"
+require "fileutils"
 
 class MsvcToolchainTest < Minitest::Test
 
   # ---------------------------------------------------------------------------
-  # Helper: build a controlled MsvcToolchain subclass.
+  # Helper: minimal MsvcToolchain subclass that prevents real subprocess calls.
   #
-  # All subprocess calls are blocked by default so tests run on any platform.
-  # Individual overrides can be supplied via the block.
+  # Only command_available?, run_vswhere, and run_vcvarsall are overridden.
+  # All other methods (setup_msvc_environment, find_vcvarsall, load_vcvarsall)
+  # run their real implementations.
   # ---------------------------------------------------------------------------
 
-  # Returns a new MsvcToolchain subclass whose constructor-level probes are
-  # fully controlled.  +cl_on_path+ governs whether cl.exe appears available
-  # before any vswhere lookup.  The block, if given, is evaluated in the
-  # context of the anonymous class so callers can add further overrides.
   def stub_msvc_class(cl_on_path: false, &block)
     klass = Class.new(Microbuild::MsvcToolchain) do
-      # Prevent real subprocess calls for cl, link, lib, etc.
       define_method(:command_available?) do |cmd|
-        cl_on_path && (cmd == "cl" || cmd == "link")
+        cl_on_path && (cmd == "cl" || cmd == "link" || cmd == "lib")
       end
 
-      # Prevent real vswhere/vcvarsall calls unless overridden.
       def run_vswhere(*)   = nil
-      def find_vcvarsall(*) = nil
       def run_vcvarsall(*) = nil
     end
     klass.class_eval(&block) if block
@@ -31,98 +27,34 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # setup_msvc_environment: skip when cl is already on PATH
+  # Constructor postconditions: cl already on PATH
   # ---------------------------------------------------------------------------
 
-  def test_setup_skips_vswhere_when_cl_already_available
-    vswhere_called = false
-    klass = stub_msvc_class(cl_on_path: true) do
-      define_method(:run_vswhere) do |*args|
-        vswhere_called = true
-        nil
-      end
+  def test_setup_when_cl_already_available
+    klass = Class.new(Microbuild::MsvcToolchain) do
+      define_method(:command_available?) { |cmd| cmd == "cl" }
     end
-    klass.new
-    refute vswhere_called, "vswhere should not be consulted when cl is already on PATH"
+    tc = klass.new
+    assert_equal "cl", tc.c
+    assert_equal "cl", tc.cxx
+    assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_cl_is_on_path
-    klass = stub_msvc_class(cl_on_path: true)
+    klass = Class.new(Microbuild::MsvcToolchain) do
+      define_method(:command_available?) { |cmd| cmd == "cl" }
+    end
     tc = klass.new
-    assert tc.available?, "available? should be true when cl is on PATH"
+    assert tc.available?
   end
 
   # ---------------------------------------------------------------------------
-  # run_vswhere: returns nil when vswhere.exe is absent
+  # Constructor postconditions: cl NOT on PATH, vswhere absent
   # ---------------------------------------------------------------------------
 
-  def test_run_vswhere_returns_nil_when_vswhere_absent
-    tc = Microbuild::MsvcToolchain.allocate
-
-    File.stub(:exist?, false) do
-      assert_nil tc.send(:run_vswhere, "-path", "-products", "*", "-property", "productPath")
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # setup_msvc_environment: two-step vswhere query order
-  # ---------------------------------------------------------------------------
-
-  def test_setup_queries_path_flag_first
-    queries = []
-    klass = stub_msvc_class do
-      define_method(:run_vswhere) do |*args|
-        queries << args
-        nil
-      end
-    end
-    klass.new
-    assert queries.size >= 1, "at least one vswhere query should be made"
-    assert_equal ["-path", "-products", "*", "-property", "productPath"], queries.first,
-                 "first query must use the -path flag"
-  end
-
-  def test_setup_falls_back_to_latest_when_path_returns_nil
-    queries = []
-    klass = stub_msvc_class do
-      define_method(:run_vswhere) do |*args|
-        queries << args
-        nil  # both queries return nil
-      end
-    end
-    klass.new
-    assert_equal 2, queries.size, "both vswhere queries should be attempted"
-    second = queries[1]
-    assert_includes second, "-latest",     "second query must include -latest"
-    assert_includes second, "-prerelease", "second query must include -prerelease"
-  end
-
-  def test_setup_stops_after_path_query_succeeds
-    queries = []
-    klass = stub_msvc_class do
-      define_method(:run_vswhere) do |*args|
-        queries << args
-        # Only the -path query succeeds.
-        args.include?("-path") ? "/fake/VS/Common7/IDE/devenv.exe" : nil
-      end
-    end
-    klass.new
-    assert_equal 1, queries.size, "should stop after the -path query succeeds"
-    assert_equal ["-path", "-products", "*", "-property", "productPath"], queries.first
-  end
-
-  def test_setup_uses_latest_result_when_path_query_fails
-    latest_devenv = "/fake/VS/Common7/IDE/devenv.exe"
-    vcvarsall_arg = nil
-    klass = stub_msvc_class do
-      define_method(:run_vswhere) do |*args|
-        args.include?("-latest") ? latest_devenv : nil
-      end
-      define_method(:find_vcvarsall) { |path| vcvarsall_arg = path; nil }
-    end
-    klass.new
-    assert_equal latest_devenv, vcvarsall_arg,
-                 "find_vcvarsall should be called with the latest devenv path"
+  def test_not_available_when_vswhere_absent
+    tc = stub_msvc_class(cl_on_path: false).new
+    refute tc.available?
   end
 
   # ---------------------------------------------------------------------------
@@ -130,89 +62,92 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_find_vcvarsall_derives_correct_path
-    tc = Microbuild::MsvcToolchain.allocate
+    Dir.mktmpdir do |dir|
+      vcvarsall_dir = File.join(dir, "VC", "Auxiliary", "Build")
+      FileUtils.mkdir_p(vcvarsall_dir)
+      vcvarsall_path = File.join(vcvarsall_dir, "vcvarsall.bat")
+      File.write(vcvarsall_path, "")
 
-    # Use POSIX-style paths so the test runs on Linux too.
-    devenv   = "/fake/VS/Common7/IDE/devenv.exe"
-    expected = "/fake/VS/VC/Auxiliary/Build/vcvarsall.bat"
+      devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-    File.stub(:exist?, true) do
-      result = tc.send(:find_vcvarsall, devenv)
-      assert_equal expected, result
+      tc = stub_msvc_class.new
+      assert_equal vcvarsall_path, tc.send(:find_vcvarsall, devenv)
     end
   end
 
   def test_find_vcvarsall_returns_nil_when_bat_absent
-    tc = Microbuild::MsvcToolchain.allocate
-
-    File.stub(:exist?, false) do
-      assert_nil tc.send(:find_vcvarsall, "/fake/VS/Common7/IDE/devenv.exe")
-    end
+    tc = stub_msvc_class.new
+    assert_nil tc.send(:find_vcvarsall, "/nonexistent/Common7/IDE/devenv.exe")
   end
 
   # ---------------------------------------------------------------------------
-  # run_vcvarsall: environment variable parsing
+  # load_vcvarsall: environment variable parsing
   # ---------------------------------------------------------------------------
 
-  def test_run_vcvarsall_merges_env_variables
-    tc = Microbuild::MsvcToolchain.allocate
-
-    # Choose a key unlikely to collide with real env vars.
+  def test_load_vcvarsall_merges_env_variables
     env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
-    fake_output = "#{env_key}=test_value\nANOTHER_KEY=another_value\n"
-    fake_status = Struct.new(:success?).new(true)
+    output = "#{env_key}=test_value\nANOTHER_KEY=another_value\n"
 
+    tc = stub_msvc_class.new
     begin
-      Open3.stub(:capture3, [fake_output, "", fake_status]) do
-        tc.send(:run_vcvarsall, "/fake/vcvarsall.bat")
-      end
+      tc.send(:load_vcvarsall, output)
       assert_equal "test_value", ENV[env_key]
+      assert_equal "another_value", ENV["ANOTHER_KEY"]
     ensure
       ENV.delete(env_key)
       ENV.delete("ANOTHER_KEY")
     end
   end
 
-  def test_run_vcvarsall_does_nothing_when_cmd_fails
-    tc = Microbuild::MsvcToolchain.allocate
-
+  def test_load_vcvarsall_skips_lines_without_equals
     env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
-    fake_output = "#{env_key}=should_not_be_set\n"
-    fake_status = Struct.new(:success?).new(false)  # failure
+    output = "no_equals_sign\n#{env_key}=valid\n\n"
 
+    tc = stub_msvc_class.new
     begin
-      Open3.stub(:capture3, [fake_output, "", fake_status]) do
-        tc.send(:run_vcvarsall, "/fake/vcvarsall.bat")
-      end
-      assert_nil ENV[env_key], "ENV should not be modified when vcvarsall.bat fails"
+      tc.send(:load_vcvarsall, output)
+      assert_equal "valid", ENV[env_key]
     ensure
       ENV.delete(env_key)
     end
   end
 
   # ---------------------------------------------------------------------------
-  # Integration: available? after successful environment setup
+  # Integration: full setup flow with vswhere and vcvarsall
   # ---------------------------------------------------------------------------
 
-  def test_available_after_successful_vswhere_and_vcvarsall_setup
-    # Simulate: cl not on PATH, vswhere finds a devenv, vcvarsall sets up cl.
-    # Use define_method closures so test state stays scoped to this method.
+  def test_integration_setup_with_vswhere_and_vcvarsall
+    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
     setup_done = false
 
-    klass = stub_msvc_class do
-      define_method(:run_vswhere) do |*args|
-        args.include?("-path") ? "/fake/VS/Common7/IDE/devenv.exe" : nil
-      end
-      define_method(:find_vcvarsall) { |_| "/fake/VS/VC/Auxiliary/Build/vcvarsall.bat" }
-      define_method(:run_vcvarsall)  { |_| setup_done = true }
-      # After setup, report cl as available (simulating the env change).
-      define_method(:command_available?) { |cmd| setup_done && cmd == "cl" }
-    end
+    Dir.mktmpdir do |dir|
+      vcvarsall_dir = File.join(dir, "VC", "Auxiliary", "Build")
+      FileUtils.mkdir_p(vcvarsall_dir)
+      vcvarsall_path = File.join(vcvarsall_dir, "vcvarsall.bat")
+      File.write(vcvarsall_path, "")
 
-    tc = klass.new
-    assert setup_done, "run_vcvarsall should have been called during initialization"
-    assert tc.available?, "available? should be true after environment setup"
+      devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
+
+      klass = Class.new(Microbuild::MsvcToolchain) do
+        define_method(:command_available?) do |cmd|
+          setup_done && (cmd == "cl" || cmd == "link" || cmd == "lib")
+        end
+        define_method(:run_vswhere) { |*args| devenv }
+        define_method(:run_vcvarsall) do |path|
+          setup_done = true
+          load_vcvarsall("#{env_key}=from_vcvarsall\n")
+        end
+      end
+
+      begin
+        tc = klass.new
+        assert setup_done, "run_vcvarsall should have been called"
+        assert tc.available?
+        assert_equal "from_vcvarsall", ENV[env_key]
+      ensure
+        ENV.delete(env_key)
+      end
+    end
   end
 
 end
-

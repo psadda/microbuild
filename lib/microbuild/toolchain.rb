@@ -199,7 +199,13 @@ module Microbuild
       stdout, _, status = Open3.capture3("cmd.exe", "/c", "\"#{vcvarsall}\" x64 && set")
       return unless status.success?
 
-      stdout.each_line do |line|
+      load_vcvarsall(stdout)
+    end
+
+    # Parses the output of `vcvarsall.bat … && set` and merges the resulting
+    # environment variables into the current process's ENV.
+    def load_vcvarsall(output)
+      output.each_line do |line|
         key, sep, value = line.chomp.partition("=")
         next if sep.empty?
         ENV[key] = value
