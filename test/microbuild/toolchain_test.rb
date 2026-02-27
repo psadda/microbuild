@@ -154,3 +154,100 @@ class MsvcToolchainTest < Minitest::Test
   end
 
 end
+
+class ClangClToolchainTest < Minitest::Test
+
+  # ---------------------------------------------------------------------------
+  # Helper: minimal ClangClToolchain subclass that prevents real subprocess calls.
+  # ---------------------------------------------------------------------------
+
+  def stub_clang_cl_class(clang_cl_on_path: false, &block)
+    klass = Class.new(Microbuild::ClangClToolchain) do
+      define_method(:command_available?) do |cmd|
+        clang_cl_on_path && (cmd == "clang-cl" || cmd == "link" || cmd == "lib")
+      end
+
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end
+    klass.class_eval(&block) if block
+    klass
+  end
+
+  # ---------------------------------------------------------------------------
+  # Constructor postconditions
+  # ---------------------------------------------------------------------------
+
+  def test_type_is_clang_cl
+    tc = stub_clang_cl_class(clang_cl_on_path: true).new
+    assert_equal :clang_cl, tc.type
+  end
+
+  def test_compiler_commands_are_clang_cl
+    tc = stub_clang_cl_class(clang_cl_on_path: true).new
+    assert_equal "clang-cl", tc.c
+    assert_equal "clang-cl", tc.cxx
+  end
+
+  def test_linker_is_link
+    tc = stub_clang_cl_class(clang_cl_on_path: true).new
+    assert_equal "link", tc.ld
+  end
+
+  def test_available_returns_true_when_clang_cl_is_on_path
+    tc = stub_clang_cl_class(clang_cl_on_path: true).new
+    assert tc.available?
+  end
+
+  def test_not_available_when_clang_cl_absent
+    tc = stub_clang_cl_class(clang_cl_on_path: false).new
+    refute tc.available?
+  end
+
+  # ---------------------------------------------------------------------------
+  # Flags: inherits MSVC-compatible flags
+  # ---------------------------------------------------------------------------
+
+  def test_flags_returns_msvc_flags
+    tc = stub_clang_cl_class(clang_cl_on_path: true).new
+    assert_equal Microbuild::MsvcToolchain::MSVC_FLAGS, tc.flags
+  end
+
+  # ---------------------------------------------------------------------------
+  # Integration: full setup flow with vswhere and vcvarsall
+  # ---------------------------------------------------------------------------
+
+  def test_integration_setup_with_vswhere_and_vcvarsall
+    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
+    setup_done = false
+
+    Dir.mktmpdir do |dir|
+      vcvarsall_dir = File.join(dir, "VC", "Auxiliary", "Build")
+      FileUtils.mkdir_p(vcvarsall_dir)
+      vcvarsall_path = File.join(vcvarsall_dir, "vcvarsall.bat")
+      File.write(vcvarsall_path, "")
+
+      devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
+
+      klass = Class.new(Microbuild::ClangClToolchain) do
+        define_method(:command_available?) do |cmd|
+          setup_done && (cmd == "clang-cl" || cmd == "link" || cmd == "lib")
+        end
+        define_method(:run_vswhere) { |*args| devenv }
+        define_method(:run_vcvarsall) do |path|
+          setup_done = true
+          load_vcvarsall("#{env_key}=from_vcvarsall\n")
+        end
+      end
+
+      begin
+        tc = klass.new
+        assert tc.available?
+        assert_equal "from_vcvarsall", ENV[env_key]
+      ensure
+        ENV.delete(env_key)
+      end
+    end
+  end
+
+end

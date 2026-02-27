@@ -129,7 +129,7 @@ module Microbuild
         pic:           ["-fPIC"],
       }.freeze
 
-    GCC_FLAGS = UniversalFlags.new(**gnu_like_flags).freeze
+    GCC_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS).freeze
 
     def flags
       GCC_FLAGS
@@ -292,6 +292,36 @@ module Microbuild
         next if sep.empty?
         ENV[key] = value
       end
+    end
+
+  end
+
+  # clang-cl toolchain – uses clang-cl compiler with MSVC-compatible flags and
+  # environment setup.
+  class ClangClToolchain < MsvcToolchain
+
+    def initialize
+      @type = :clang_cl
+      @c    = "clang-cl"
+      @cxx  = "clang-cl"
+      @ld   = "link"
+      setup_msvc_environment
+      @ar   = "lib" if command_available?("lib")
+    end
+
+    private
+
+    def setup_msvc_environment
+      return if command_available?("clang-cl")
+
+      devenv_path = run_vswhere("-path", "-property", "productPath") ||
+                    run_vswhere("-latest", "-prerelease", "-property", "productPath")
+      return unless devenv_path
+
+      vcvarsall = find_vcvarsall(devenv_path)
+      return unless vcvarsall
+
+      run_vcvarsall(vcvarsall)
     end
 
   end
