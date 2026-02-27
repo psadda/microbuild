@@ -4,7 +4,7 @@ require "test_helper"
 require "securerandom"
 require "tmpdir"
 require "fileutils"
-require "microbuild/toolchain"
+require "metacc/toolchain"
 
 
 class MsvcToolchainTest < Minitest::Test
@@ -18,7 +18,7 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def stub_msvc_class(cl_on_path: false, &block)
-    klass = Class.new(Microbuild::MsvcToolchain) do
+    klass = Class.new(MetaCC::MsvcToolchain) do
       define_method(:command_available?) do |cmd|
         cl_on_path && cmd == "cl"
       end
@@ -35,7 +35,7 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_setup_when_cl_already_available
-    klass = Class.new(Microbuild::MsvcToolchain) do
+    klass = Class.new(MetaCC::MsvcToolchain) do
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
@@ -45,7 +45,7 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   def test_available_returns_true_when_cl_is_on_path
-    klass = Class.new(Microbuild::MsvcToolchain) do
+    klass = Class.new(MetaCC::MsvcToolchain) do
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
@@ -96,7 +96,7 @@ class MsvcToolchainTest < Minitest::Test
   # method available.  Defines its own initialize to avoid the pre-existing
   # super arity issue in MsvcToolchain#initialize.
   def msvc_for_vcvarsall_command
-    Class.new(Microbuild::MsvcToolchain) do
+    Class.new(MetaCC::MsvcToolchain) do
       def initialize; end
     end.new
   end
@@ -127,8 +127,8 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_load_vcvarsall_merges_env_variables
-    key_a = "MICROBUILD_TEST_A_#{SecureRandom.hex(8)}"
-    key_b = "MICROBUILD_TEST_B_#{SecureRandom.hex(8)}"
+    key_a = "METACC_TEST_A_#{SecureRandom.hex(8)}"
+    key_b = "METACC_TEST_B_#{SecureRandom.hex(8)}"
     output = "#{key_a}=test_value\n#{key_b}=another_value\n"
 
     tc = stub_msvc_class.new
@@ -144,7 +144,7 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   def test_load_vcvarsall_skips_lines_without_equals
-    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
+    env_key = "METACC_TEST_#{SecureRandom.hex(8)}"
     output = "no_equals_sign\n#{env_key}=valid\n\n"
 
     tc = stub_msvc_class.new
@@ -162,7 +162,7 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_integration_setup_with_vswhere_and_vcvarsall
-    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
+    env_key = "METACC_TEST_#{SecureRandom.hex(8)}"
     setup_done = false
 
     Dir.mktmpdir do |dir|
@@ -173,7 +173,7 @@ class MsvcToolchainTest < Minitest::Test
 
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-      klass = Class.new(Microbuild::MsvcToolchain) do
+      klass = Class.new(MetaCC::MsvcToolchain) do
         define_method(:command_available?) do |cmd|
           setup_done && cmd == "cl"
         end
@@ -205,7 +205,7 @@ class ClangClToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
-    klass = Class.new(Microbuild::ClangClToolchain) do
+    klass = Class.new(MetaCC::ClangClToolchain) do
       define_method(:command_available?) do |cmd|
         clang_cl_on_path && cmd == "clang-cl"
       end
@@ -253,7 +253,7 @@ class ClangClToolchainTest < Minitest::Test
   def test_flags_returns_msvc_flags
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
-    assert_equal Microbuild::MsvcToolchain::MSVC_FLAGS, tc.flags
+    assert_equal MetaCC::MsvcToolchain::MSVC_FLAGS, tc.flags
   end
 
   # ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ class ClangClToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_integration_setup_with_vswhere_and_vcvarsall
-    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
+    env_key = "METACC_TEST_#{SecureRandom.hex(8)}"
     setup_done = false
 
     Dir.mktmpdir do |dir|
@@ -272,7 +272,7 @@ class ClangClToolchainTest < Minitest::Test
 
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-      klass = Class.new(Microbuild::ClangClToolchain) do
+      klass = Class.new(MetaCC::ClangClToolchain) do
         define_method(:command_available?) do |cmd|
           setup_done && cmd == "clang-cl"
         end
@@ -301,7 +301,7 @@ class GnuToolchainCommandTest < Minitest::Test
   # GnuToolchain#command is a pure method – no subprocess calls needed.
 
   def gnu
-    Class.new(Microbuild::GnuToolchain) do
+    Class.new(MetaCC::GnuToolchain) do
       def command_available?(_cmd) = true
     end.new
   end
@@ -347,7 +347,7 @@ class MsvcToolchainCommandTest < Minitest::Test
   # Override initialize to avoid the super arity issue in MsvcToolchain#initialize,
   # following the same pattern as msvc_for_vcvarsall_command in MsvcToolchainTest.
   def msvc
-    Class.new(Microbuild::MsvcToolchain) do
+    Class.new(MetaCC::MsvcToolchain) do
       def initialize
         @type = :msvc
         @c    = "cl"

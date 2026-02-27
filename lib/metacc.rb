@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-require "microbuild/driver"
+require "metacc/driver"
 
-module Microbuild
+module MetaCC
 
   VERSION = "0.1.0"
 

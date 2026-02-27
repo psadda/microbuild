@@ -3,7 +3,7 @@
 require "open3"
 require_relative "toolchain"
 
-module Microbuild
+module MetaCC
 
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end

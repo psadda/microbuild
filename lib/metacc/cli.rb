@@ -3,9 +3,9 @@
 require "optparse"
 require_relative "driver"
 
-module Microbuild
+module MetaCC
 
-  # Command-line interface for the Microbuild Driver.
+  # Command-line interface for the MetaCC Driver.
   #
   # Subcommands:
   #   c   <sources...> -o <output> [options]         – compile C source file(s)
@@ -33,7 +33,7 @@ module Microbuild
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
-    LONG_FLAGS = {
+    LONG_FLAG_MAP = {
       "lto"           => :lto,
       "asan"          => :asan,
       "ubsan"         => :ubsan,
@@ -94,7 +94,7 @@ module Microbuild
         driver = build_driver
         link_objects(driver, link_type, objects, options[:output], options[:libs], options[:linker_include_dirs])
       else
-        warn "Usage: microbuild <c|cxx|link> [options] <files...>"
+        warn "Usage: metacc <c|cxx|link> [options] <files...>"
         exit 1
       end
     end
@@ -130,7 +130,7 @@ module Microbuild
           options[:flags] << WARNING_CONFIGS[value]
         end
 
-        LONG_FLAGS.each do |name, sym|
+        LONG_FLAG_MAP.each do |name, sym|
           opts.on("--#{name}") { options[:flags] << sym }
         end
 
@@ -153,7 +153,7 @@ module Microbuild
       link_type = argv.shift
 
       unless %w[static shared executable].include?(link_type)
-        warn "Usage: microbuild link <static|shared|executable> [options] <objects...>"
+        warn "Usage: metacc link <static|shared|executable> [options] <objects...>"
         exit 1
       end
 

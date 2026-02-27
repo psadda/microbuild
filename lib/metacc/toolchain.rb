@@ -2,7 +2,7 @@
 
 require "open3"
 
-module Microbuild
+module MetaCC
 
   # Base class for compiler toolchains.
   # Subclasses set their own command attributes in +initialize+ by calling

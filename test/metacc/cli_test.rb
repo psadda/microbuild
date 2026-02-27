@@ -2,7 +2,7 @@
 
 require "test_helper"
 require "tmpdir"
-require "microbuild/cli"
+require "metacc/cli"
 
 class CLITest < Minitest::Test
 
@@ -10,7 +10,7 @@ class CLITest < Minitest::Test
   # parse_compile_args – include paths
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_include_short
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, sources = cli.parse_compile_args(["-i", "/usr/include", "main.c"])
 
     assert_equal ["/usr/include"], options[:includes]
@@ -18,14 +18,14 @@ class CLITest < Minitest::Test
   end
 
   def test_parse_compile_args_include_long
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--include", "/opt/include", "main.c"])
 
     assert_equal ["/opt/include"], options[:includes]
   end
 
   def test_parse_compile_args_multiple_includes
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-i", "/a", "-i", "/b", "main.c"])
 
     assert_equal ["/a", "/b"], options[:includes]
@@ -35,21 +35,21 @@ class CLITest < Minitest::Test
   # parse_compile_args – definitions
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_define_short
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-d", "FOO=1", "main.c"])
 
     assert_equal ["FOO=1"], options[:defines]
   end
 
   def test_parse_compile_args_define_long
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--define", "BAR", "main.c"])
 
     assert_equal ["BAR"], options[:defines]
   end
 
   def test_parse_compile_args_multiple_defines
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-d", "FOO", "-d", "BAR=2", "main.c"])
 
     assert_equal ["FOO", "BAR=2"], options[:defines]
@@ -59,14 +59,14 @@ class CLITest < Minitest::Test
   # parse_compile_args – output path
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_output_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-o", "out.o", "main.c"])
 
     assert_equal "out.o", options[:output]
   end
 
   def test_parse_compile_args_output_defaults_to_nil
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["main.c"])
 
     assert_nil options[:output]
@@ -76,28 +76,28 @@ class CLITest < Minitest::Test
   # parse_compile_args – optimization flags
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_O0_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-O0", "main.c"])
 
     assert_includes options[:flags], :o0
   end
 
   def test_parse_compile_args_O1_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-O1", "main.c"])
 
     assert_includes options[:flags], :o1
   end
 
   def test_parse_compile_args_O2_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-O2", "main.c"])
 
     assert_includes options[:flags], :o2
   end
 
   def test_parse_compile_args_O3_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-O3", "main.c"])
 
     assert_includes options[:flags], :o3
@@ -107,21 +107,21 @@ class CLITest < Minitest::Test
   # parse_compile_args – RECOGNIZED_FLAGS long-form options
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_avx_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--avx", "main.c"])
 
     assert_includes options[:flags], :avx
   end
 
   def test_parse_compile_args_debug_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--debug", "main.c"])
 
     assert_includes options[:flags], :debug
   end
 
   def test_parse_compile_args_multiple_recognized_flags
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--avx2", "--debug", "--lto", "main.c"])
 
     assert_includes options[:flags], :avx2
@@ -130,8 +130,8 @@ class CLITest < Minitest::Test
   end
 
   def test_parse_compile_args_all_long_flag_map_flags
-    cli = Microbuild::CLI.new
-    Microbuild::CLI::LONG_FLAG_MAP.each do |name, sym|
+    cli = MetaCC::CLI.new
+    MetaCC::CLI::LONG_FLAG_MAP.each do |name, sym|
       options, _sources = cli.parse_compile_args(["--#{name}", "main.c"])
 
       assert_includes options[:flags], sym, "--#{name} should produce :#{sym}"
@@ -142,42 +142,42 @@ class CLITest < Minitest::Test
   # parse_compile_args – xflags
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_xmsvc_single_value
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xmsvc", "Z7", "main.c"])
 
     assert_equal ["Z7"], options[:xflags][:msvc]
   end
 
   def test_parse_compile_args_xmsvc_multiple_values
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xmsvc", "Z7", "--xmsvc", "/EHc", "main.c"])
 
     assert_equal ["Z7", "/EHc"], options[:xflags][:msvc]
   end
 
   def test_parse_compile_args_xgnu_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xgnu", "-march=skylake", "main.c"])
 
     assert_equal ["-march=skylake"], options[:xflags][:gcc]
   end
 
   def test_parse_compile_args_xclang_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xclang", "-fcolor-diagnostics", "main.c"])
 
     assert_equal ["-fcolor-diagnostics"], options[:xflags][:clang]
   end
 
   def test_parse_compile_args_xclang_cl_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xclang_cl", "/Ot", "main.c"])
 
     assert_equal ["/Ot"], options[:xflags][:clang_cl]
   end
 
   def test_parse_compile_args_mixed_xflags
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(
       ["--xmsvc", "Z7", "--xgnu", "-funroll-loops", "--xmsvc", "/EHc", "main.c"]
     )
@@ -190,14 +190,14 @@ class CLITest < Minitest::Test
   # parse_compile_args – positional arguments (source files)
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_multiple_sources
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _options, sources = cli.parse_compile_args(["a.c", "b.c", "c.c"])
 
     assert_equal ["a.c", "b.c", "c.c"], sources
   end
 
   def test_parse_compile_args_options_and_sources_mixed
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     options, sources = cli.parse_compile_args(["-O2", "-i", "/inc", "foo.c", "bar.c"])
 
     assert_includes options[:flags], :o2
@@ -209,84 +209,84 @@ class CLITest < Minitest::Test
   # parse_link_args
   # ---------------------------------------------------------------------------
   def test_parse_link_args_executable_type
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     link_type, _options, _objects = cli.parse_link_args(["executable", "main.o"])
 
     assert_equal "executable", link_type
   end
 
   def test_parse_link_args_static_type
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     link_type, _options, _objects = cli.parse_link_args(["static", "a.o", "b.o"])
 
     assert_equal "static", link_type
   end
 
   def test_parse_link_args_shared_type
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     link_type, _options, _objects = cli.parse_link_args(["shared", "util.o"])
 
     assert_equal "shared", link_type
   end
 
   def test_parse_link_args_output_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "-o", "myapp", "main.o"])
 
     assert_equal "myapp", options[:output]
   end
 
   def test_parse_link_args_object_files
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, _options, objects = cli.parse_link_args(["static", "-o", "lib.a", "a.o", "b.o"])
 
     assert_equal ["a.o", "b.o"], objects
   end
 
   def test_parse_link_args_invalid_type_exits
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     assert_raises(SystemExit) do
       cli.parse_link_args(["bogus", "main.o"])
     end
   end
 
   def test_parse_link_args_lib_short_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "main.o"])
 
     assert_equal ["m"], options[:libs]
   end
 
   def test_parse_link_args_lib_long_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "--lib", "pthread", "main.o"])
 
     assert_equal ["pthread"], options[:libs]
   end
 
   def test_parse_link_args_multiple_libs
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "-l", "pthread", "main.o"])
 
     assert_equal ["m", "pthread"], options[:libs]
   end
 
   def test_parse_link_args_libdir_short_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "-L", "/usr/local/lib", "main.o"])
 
     assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_link_args_libdir_long_flag
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "--libdir", "/opt/lib", "main.o"])
 
     assert_equal ["/opt/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_link_args_libs_and_libdirs_defaults_to_empty
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     _link_type, options, _objects = cli.parse_link_args(["executable", "main.o"])
 
     assert_equal [], options[:libs]
@@ -297,12 +297,12 @@ class CLITest < Minitest::Test
   # run – unknown subcommand exits
   # ---------------------------------------------------------------------------
   def test_run_unknown_subcommand_exits
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     assert_raises(SystemExit) { cli.run(["unknown"]) }
   end
 
   def test_run_no_subcommand_exits
-    cli = Microbuild::CLI.new
+    cli = MetaCC::CLI.new
     assert_raises(SystemExit) { cli.run([]) }
   end
 
@@ -334,7 +334,7 @@ class CLITest < Minitest::Test
   end
 
   # A CLI subclass that injects a StubDriver so no subprocess calls are made.
-  class TestCLI < Microbuild::CLI
+  class TestCLI < MetaCC::CLI
 
     attr_reader :stub_driver
 

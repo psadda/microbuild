@@ -3,6 +3,6 @@
 
 $LOAD_PATH.unshift(File.join(__dir__, "..", "lib"))
 
-require "microbuild/cli"
+require "metacc/cli"
 
-Microbuild::CLI.run
+MetaCC::CLI.run

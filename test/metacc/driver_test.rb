@@ -12,44 +12,44 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_initializes_when_compiler_present
     # The CI environment has clang or gcc installed.
-    assert_instance_of Microbuild::Driver, Microbuild::Driver.new
+    assert_instance_of MetaCC::Driver, MetaCC::Driver.new
   end
 
   def test_compiler_type_is_known
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
 
     assert_includes %i[clang gcc msvc], builder.toolchain.type
   end
 
   def test_compiler_is_compiler_info_struct
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
 
-    assert_kind_of Microbuild::Toolchain, builder.toolchain
+    assert_kind_of MetaCC::Toolchain, builder.toolchain
   end
 
   def test_raises_when_no_compiler_found
     # Use an anonymous subclass with no toolchain classes to probe.
-    klass = Class.new(Microbuild::Driver) do
+    klass = Class.new(MetaCC::Driver) do
       private
 
       def toolchain_classes
         []
       end
     end
-    assert_raises(Microbuild::CompilerNotFoundError) { klass.new }
+    assert_raises(MetaCC::CompilerNotFoundError) { klass.new }
   end
 
   # ---------------------------------------------------------------------------
   # log accumulation
   # ---------------------------------------------------------------------------
   def test_log_is_empty_before_any_command
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
 
     assert_empty builder.log
   end
 
   def test_log_accumulates_entries_after_invoke
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -67,7 +67,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_log_grows_with_each_invocation
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
       obj = File.join(dir, "main.o")
@@ -86,7 +86,7 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_stdout_sink_receives_write_calls
     sink = StringIO.new
-    builder = Microbuild::Driver.new(stdout_sink: sink)
+    builder = MetaCC::Driver.new(stdout_sink: sink)
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -100,7 +100,7 @@ class DriverTest < Minitest::Test
 
   def test_stderr_sink_receives_error_output
     sink = StringIO.new
-    builder = Microbuild::Driver.new(stderr_sink: sink)
+    builder = MetaCC::Driver.new(stderr_sink: sink)
     Dir.mktmpdir do |dir|
       src = File.join(dir, "broken.c")
       obj = File.join(dir, "broken.o")
@@ -114,13 +114,13 @@ class DriverTest < Minitest::Test
 
   def test_same_object_can_be_used_for_both_sinks
     sink = StringIO.new
-    builder = Microbuild::Driver.new(stdout_sink: sink, stderr_sink: sink)
+    builder = MetaCC::Driver.new(stdout_sink: sink, stderr_sink: sink)
 
-    assert_instance_of Microbuild::Driver, builder
+    assert_instance_of MetaCC::Driver, builder
   end
 
   def test_no_sinks_does_not_raise
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -134,7 +134,7 @@ class DriverTest < Minitest::Test
   # #invoke – compile to object files (objects flag)
   # ---------------------------------------------------------------------------
   def test_invoke_objects_c_source_returns_true_and_creates_object_file
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -148,7 +148,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_objects_cxx_source_returns_true_and_creates_object_file
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.cpp")
       obj = File.join(dir, "hello.o")
@@ -162,7 +162,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_objects_with_include_paths_and_definitions
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       inc_dir = File.join(dir, "include")
       FileUtils.mkdir_p(inc_dir)
@@ -185,7 +185,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_objects_broken_source_returns_false
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "broken.c")
       obj = File.join(dir, "broken.o")
@@ -201,7 +201,7 @@ class DriverTest < Minitest::Test
   # #invoke – link to executable (no mode flag)
   # ---------------------------------------------------------------------------
   def test_invoke_executable_creates_executable
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
       obj = File.join(dir, "main.o")
@@ -217,7 +217,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_executable_missing_object_returns_false
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       result = builder.invoke([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
 
@@ -229,7 +229,7 @@ class DriverTest < Minitest::Test
   # #invoke – shared library (shared flag)
   # ---------------------------------------------------------------------------
   def test_invoke_shared_creates_shared_library
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
     Dir.mktmpdir do |dir|
@@ -250,7 +250,7 @@ class DriverTest < Minitest::Test
   # incremental build: up-to-date skipping and force: override
   # ---------------------------------------------------------------------------
   def test_invoke_objects_skips_when_output_is_up_to_date
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -272,7 +272,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_objects_force_overrides_up_to_date
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -291,7 +291,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_executable_skips_when_output_is_up_to_date
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
       obj = File.join(dir, "main.o")
@@ -315,7 +315,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_executable_force_overrides_up_to_date
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
       obj = File.join(dir, "main.o")
@@ -336,7 +336,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_shared_skips_when_output_is_up_to_date
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
 
     Dir.mktmpdir do |dir|
@@ -369,7 +369,7 @@ class DriverTest < Minitest::Test
       build_dir = File.join(dir, "out")
       FileUtils.mkdir_p(build_dir)
 
-      builder = Microbuild::Driver.new(output_dir: build_dir)
+      builder = MetaCC::Driver.new(output_dir: build_dir)
       result = builder.invoke(src, "hello.o", flags: [:objects])
 
       assert result, "expected invoke to succeed"
@@ -383,7 +383,7 @@ class DriverTest < Minitest::Test
       obj = File.join(dir, "hello.o") # absolute
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder = Microbuild::Driver.new(output_dir: "/nonexistent_build_dir")
+      builder = MetaCC::Driver.new(output_dir: "/nonexistent_build_dir")
       result = builder.invoke(src, obj, flags: [:objects])
 
       assert result, "expected invoke to succeed with absolute output path"
@@ -392,7 +392,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_output_dir_default_is_build
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
 
     assert_equal "build", builder.output_dir
   end
@@ -401,7 +401,7 @@ class DriverTest < Minitest::Test
   # env: and working_dir: per-invocation options
   # ---------------------------------------------------------------------------
   def test_invoke_accepts_env_and_working_dir
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -414,7 +414,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_invoke_executable_accepts_env_and_working_dir
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
       obj = File.join(dir, "main.o")
@@ -429,7 +429,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_env_variables_are_forwarded_to_subprocess
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       # Pass a harmless env var; compilation should still succeed.
       src = File.join(dir, "hello.c")
@@ -443,7 +443,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_working_dir_sets_subprocess_cwd
-    builder = Microbuild::Driver.new
+    builder = MetaCC::Driver.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
