@@ -186,9 +186,9 @@ class DriverTest < Minitest::Test
 
       result = builder.compile(
         src, obj,
-        flags: [],
+        flags:         [],
         include_paths: [inc_dir],
-        definitions: ["UNUSED=1"]
+        definitions:   ["UNUSED=1"]
       )
 
       assert result, "expected compile to return true"
