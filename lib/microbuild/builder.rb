@@ -5,20 +5,22 @@ module Microbuild
   class CompilerNotFoundError < StandardError; end
 
   # Holds information about a detected compiler toolchain.
-  #   type – symbolic name (:clang, :gcc, :msvc)
-  #   c    – command used to compile C source files
-  #   cxx  – command used to compile C++ source files
-  #   ld   – command used to link object files
-  CompilerInfo = Struct.new(:type, :c, :cxx, :ld)
+  #   type   – symbolic name (:clang, :gcc, :msvc)
+  #   c      – command used to compile C source files
+  #   cxx    – command used to compile C++ source files
+  #   ld     – command used to link executables and shared libraries
+  #   ar     – command used to create static libraries (nil if not found)
+  #   ranlib – command used to index static libraries (nil if not found)
+  CompilerInfo = Struct.new(:type, :c, :cxx, :ld, :ar, :ranlib)
 
   # Builder wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
     # Ordered list of compiler candidates to probe.
     COMPILER_CANDIDATES = [
-      CompilerInfo.new(:clang, "clang",   "clang++", "clang++"),
-      CompilerInfo.new(:gcc,   "gcc",     "g++",     "g++"    ),
-      CompilerInfo.new(:msvc,  "cl",      "cl",      "link"   ),
+      { type: :clang, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
+      { type: :gcc,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
+      { type: :msvc,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
     ].freeze
 
     # The detected toolchain (a CompilerInfo struct).
@@ -30,11 +32,15 @@ module Microbuild
 
     # Detects the first available C/C++ compiler toolchain.
     #
-    # @param log_sink [#call, nil] optional callable invoked with each log entry Hash
-    #                              after every compile or link command.
+    # @param stdout_sink [#write, nil] optional object whose +write+ method is called
+    #                                 with each command's stdout after every invocation.
+    # @param stderr_sink [#write, nil] optional object whose +write+ method is called
+    #                                 with each command's stderr after every invocation.
+    #                                 The same object may be passed for both sinks.
     # @raise [CompilerNotFoundError] if no supported compiler is found.
-    def initialize(log_sink: nil)
-      @log_sink = log_sink
+    def initialize(stdout_sink: nil, stderr_sink: nil)
+      @stdout_sink = stdout_sink
+      @stderr_sink = stderr_sink
       @log = []
       @compiler = detect_compiler!
     end
@@ -52,28 +58,62 @@ module Microbuild
       run_command(cmd)
     end
 
-    # Links one or more object files into an executable or shared library.
+    # Links one or more object files into an executable.
     #
     # @param object_file_paths [Array<String>] paths to the object files to link
-    # @param output_path       [String] path for the resulting binary
+    # @param output_path       [String] path for the resulting executable
     # @return [Boolean] true if linking succeeded, false otherwise
-    def link(object_file_paths, output_path)
-      cmd = build_link_command(object_file_paths, output_path)
-      run_command(cmd)
+    def link_executable(object_file_paths, output_path)
+      run_command(build_link_executable_command(object_file_paths, output_path))
+    end
+
+    # Archives one or more object files into a static library.
+    # Uses +ar rcs+ on Unix (plus +ranlib+ if detected) and +lib+ on MSVC.
+    # Returns false if the archiver (+ar+ / +lib+) is not available.
+    #
+    # @param object_file_paths [Array<String>] paths to the object files
+    # @param output_path       [String] path for the resulting static library
+    # @return [Boolean] true if archiving succeeded, false otherwise
+    def link_static(object_file_paths, output_path)
+      return false unless compiler.ar
+
+      if compiler.type == :msvc
+        run_command([compiler.ar, "/OUT:#{output_path}", *object_file_paths])
+      else
+        return false unless run_command([compiler.ar, "rcs", output_path, *object_file_paths])
+        return run_command([compiler.ranlib, output_path]) if compiler.ranlib
+        true
+      end
+    end
+
+    # Links one or more object files into a shared library.
+    #
+    # @param object_file_paths [Array<String>] paths to the object files to link
+    # @param output_path       [String] path for the resulting shared library
+    # @return [Boolean] true if linking succeeded, false otherwise
+    def link_shared(object_file_paths, output_path)
+      run_command(build_link_shared_command(object_file_paths, output_path))
     end
 
     private
 
     def detect_compiler!
       COMPILER_CANDIDATES.each do |candidate|
-        return candidate if compiler_available?(candidate.c)
+        next unless command_available?(candidate[:c])
+        ar     = candidate[:ar]     if command_available?(candidate[:ar])
+        ranlib = candidate[:ranlib] if command_available?(candidate[:ranlib])
+        return CompilerInfo.new(candidate[:type], candidate[:c], candidate[:cxx],
+                                candidate[:ld], ar, ranlib)
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
     end
 
-    def compiler_available?(command)
-      _out, _err, status = Open3.capture3(command, "--version")
-      status.success?
+    # Returns true if +command+ is present in PATH, false otherwise.
+    # Intentionally ignores the exit status – only ENOENT (not found) matters.
+    def command_available?(command)
+      return false if command.nil?
+      Open3.capture3(command, "--version")
+      true
     rescue Errno::ENOENT
       false
     end
@@ -99,11 +139,19 @@ module Microbuild
       [compiler.c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
     end
 
-    def build_link_command(object_files, output)
+    def build_link_executable_command(object_files, output)
       if compiler.type == :msvc
         [compiler.ld, *object_files, "/OUT:#{output}"]
       else
         [compiler.ld, *object_files, "-o", output]
+      end
+    end
+
+    def build_link_shared_command(object_files, output)
+      if compiler.type == :msvc
+        [compiler.ld, "/DLL", *object_files, "/OUT:#{output}"]
+      else
+        [compiler.ld, "-shared", *object_files, "-o", output]
       end
     end
 
@@ -116,7 +164,8 @@ module Microbuild
     def record_output(command, stdout, stderr)
       entry = { command: command, stdout: stdout, stderr: stderr }
       @log << entry
-      @log_sink.call(entry) if @log_sink.respond_to?(:call)
+      @stdout_sink.write(stdout) if @stdout_sink.respond_to?(:write)
+      @stderr_sink.write(stderr) if @stderr_sink.respond_to?(:write)
     end
   end
 end

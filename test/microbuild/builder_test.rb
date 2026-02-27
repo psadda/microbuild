@@ -1,6 +1,7 @@
 require "test_helper"
 require "tmpdir"
 require "fileutils"
+require "stringio"
 
 class BuilderTest < Minitest::Test
   # ---------------------------------------------------------------------------
@@ -21,12 +22,23 @@ class BuilderTest < Minitest::Test
     assert_instance_of Microbuild::CompilerInfo, builder.compiler
   end
 
+  def test_compiler_info_has_ar_field
+    builder = Microbuild::Builder.new
+    # ar is expected to be present on any standard CI system
+    refute_nil builder.compiler.ar
+  end
+
+  def test_compiler_info_ranlib_is_string_or_nil
+    builder = Microbuild::Builder.new
+    assert(builder.compiler.ranlib.nil? || builder.compiler.ranlib.is_a?(String))
+  end
+
   def test_raises_when_no_compiler_found
-    # Use an anonymous subclass that reports every compiler as unavailable.
+    # Use an anonymous subclass that reports every command as unavailable.
     klass = Class.new(Microbuild::Builder) do
       private
 
-      def compiler_available?(_cmd)
+      def command_available?(_cmd)
         false
       end
     end
@@ -66,31 +78,48 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       builder.compile(src, obj)
-      builder.link([obj], exe)
+      builder.link_executable([obj], exe)
       assert_equal 2, builder.log.size
     end
   end
 
   # ---------------------------------------------------------------------------
-  # log_sink
+  # stdout_sink / stderr_sink
   # ---------------------------------------------------------------------------
-  def test_log_sink_is_called_for_each_command
-    received = []
-    sink = ->(entry) { received << entry }
-    builder = Microbuild::Builder.new(log_sink: sink)
+  def test_stdout_sink_receives_write_calls
+    sink = StringIO.new
+    builder = Microbuild::Builder.new(stdout_sink: sink)
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
       File.write(src, "int main(void) { return 0; }\n")
 
       builder.compile(src, obj)
-      assert_equal 1, received.size
-      assert received.first.key?(:stdout)
+      assert_kind_of String, sink.string
     end
   end
 
-  def test_no_log_sink_does_not_raise
-    builder = Microbuild::Builder.new(log_sink: nil)
+  def test_stderr_sink_receives_error_output
+    sink = StringIO.new
+    builder = Microbuild::Builder.new(stderr_sink: sink)
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "broken.c")
+      obj = File.join(dir, "broken.o")
+      File.write(src, "this is not valid C code {\n")
+
+      builder.compile(src, obj)
+      refute_empty sink.string, "stderr sink should have received error output"
+    end
+  end
+
+  def test_same_object_can_be_used_for_both_sinks
+    sink = StringIO.new
+    builder = Microbuild::Builder.new(stdout_sink: sink, stderr_sink: sink)
+    assert_instance_of Microbuild::Builder, builder
+  end
+
+  def test_no_sinks_does_not_raise
+    builder = Microbuild::Builder.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
       obj = File.join(dir, "hello.o")
@@ -164,9 +193,9 @@ class BuilderTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # #link
+  # #link_executable
   # ---------------------------------------------------------------------------
-  def test_link_valid_objects_returns_true_and_creates_executable
+  def test_link_executable_creates_executable
     builder = Microbuild::Builder.new
     Dir.mktmpdir do |dir|
       src = File.join(dir, "main.c")
@@ -174,19 +203,71 @@ class BuilderTest < Minitest::Test
       exe = File.join(dir, "main")
       File.write(src, "int main(void) { return 0; }\n")
 
-      builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
-      result = builder.link([obj], exe)
-      assert result, "expected link to return true"
+      builder.compile(src, obj)
+      result = builder.link_executable([obj], exe)
+      assert result, "expected link_executable to return true"
       assert File.exist?(exe), "expected executable to be created"
     end
   end
 
-  def test_link_missing_object_file_returns_false
+  def test_link_executable_missing_object_returns_false
     builder = Microbuild::Builder.new
     Dir.mktmpdir do |dir|
-      exe = File.join(dir, "output")
-      result = builder.link([File.join(dir, "nonexistent.o")], exe)
-      refute result, "expected link to return false for missing object file"
+      result = builder.link_executable([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
+      refute result, "expected link_executable to return false for missing object file"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # #link_static
+  # ---------------------------------------------------------------------------
+  def test_link_static_creates_archive
+    builder = Microbuild::Builder.new
+    skip("ar not available") unless builder.compiler.ar
+
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "util.c")
+      obj = File.join(dir, "util.o")
+      lib = File.join(dir, "libutil.a")
+      File.write(src, "int add(int a, int b) { return a + b; }\n")
+
+      builder.compile(src, obj)
+      result = builder.link_static([obj], lib)
+      assert result, "expected link_static to return true"
+      assert File.exist?(lib), "expected static library to be created"
+    end
+  end
+
+  def test_link_static_returns_false_when_ar_unavailable
+    # Subclass whose compiler reports no archiver available.
+    klass = Class.new(Microbuild::Builder) do
+      private
+
+      def detect_compiler!
+        Microbuild::CompilerInfo.new(:gcc, "gcc", "g++", "g++", nil, nil)
+      end
+    end
+    builder = klass.new
+    refute builder.link_static([], "/tmp/fake.a"), "expected false when ar is unavailable"
+  end
+
+  # ---------------------------------------------------------------------------
+  # #link_shared
+  # ---------------------------------------------------------------------------
+  def test_link_shared_creates_shared_library
+    builder = Microbuild::Builder.new
+    skip("MSVC shared linking not tested here") if builder.compiler.type == :msvc
+
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "util.c")
+      obj = File.join(dir, "util.o")
+      lib = File.join(dir, "libutil.so")
+      File.write(src, "int add(int a, int b) { return a + b; }\n")
+
+      builder.compile(src, obj, flags: ["-fPIC"])
+      result = builder.link_shared([obj], lib)
+      assert result, "expected link_shared to return true"
+      assert File.exist?(lib), "expected shared library to be created"
     end
   end
 end
