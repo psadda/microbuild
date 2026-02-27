@@ -270,4 +270,133 @@ class BuilderTest < Minitest::Test
       assert File.exist?(lib), "expected shared library to be created"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # incremental build: up-to-date skipping and force: override
+  # ---------------------------------------------------------------------------
+  def test_compile_skips_when_output_is_up_to_date
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      assert_equal 1, builder.log.size
+
+      # Make src appear older than obj so the output is considered up-to-date.
+      past = File.mtime(obj) - 1
+      File.utime(past, past, src)
+
+      result = builder.compile(src, obj)
+      assert result, "expected skipped compile to return true"
+      assert_equal 1, builder.log.size, "log should not grow when step is skipped"
+    end
+  end
+
+  def test_compile_force_overrides_up_to_date
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+
+      past = File.mtime(obj) - 1
+      File.utime(past, past, src)
+
+      result = builder.compile(src, obj, force: true)
+      assert result, "expected forced compile to return true"
+      assert_equal 2, builder.log.size, "log should grow when force: true"
+    end
+  end
+
+  def test_link_executable_skips_when_output_is_up_to_date
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "main.c")
+      obj = File.join(dir, "main.o")
+      exe = File.join(dir, "main")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      builder.link_executable([obj], exe)
+      assert_equal 2, builder.log.size
+
+      # Make obj appear older than exe.
+      past = File.mtime(exe) - 1
+      File.utime(past, past, obj)
+
+      result = builder.link_executable([obj], exe)
+      assert result, "expected skipped link_executable to return true"
+      assert_equal 2, builder.log.size, "log should not grow when step is skipped"
+    end
+  end
+
+  def test_link_executable_force_overrides_up_to_date
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "main.c")
+      obj = File.join(dir, "main.o")
+      exe = File.join(dir, "main")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      builder.link_executable([obj], exe)
+
+      past = File.mtime(exe) - 1
+      File.utime(past, past, obj)
+
+      result = builder.link_executable([obj], exe, force: true)
+      assert result, "expected forced link_executable to return true"
+      assert_equal 3, builder.log.size, "log should grow when force: true"
+    end
+  end
+
+  def test_link_static_skips_when_output_is_up_to_date
+    builder = Microbuild::Builder.new
+    skip("ar not available") unless builder.compiler.ar
+
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "util.c")
+      obj = File.join(dir, "util.o")
+      lib = File.join(dir, "libutil.a")
+      File.write(src, "int add(int a, int b) { return a + b; }\n")
+
+      builder.compile(src, obj)
+      builder.link_static([obj], lib)
+      log_size = builder.log.size
+
+      past = File.mtime(lib) - 1
+      File.utime(past, past, obj)
+
+      result = builder.link_static([obj], lib)
+      assert result, "expected skipped link_static to return true"
+      assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
+    end
+  end
+
+  def test_link_shared_skips_when_output_is_up_to_date
+    builder = Microbuild::Builder.new
+    skip("MSVC shared linking not tested here") if builder.compiler.type == :msvc
+
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "util.c")
+      obj = File.join(dir, "util.o")
+      lib = File.join(dir, "libutil.so")
+      File.write(src, "int add(int a, int b) { return a + b; }\n")
+
+      builder.compile(src, obj, flags: ["-fPIC"])
+      builder.link_shared([obj], lib)
+      log_size = builder.log.size
+
+      past = File.mtime(lib) - 1
+      File.utime(past, past, obj)
+
+      result = builder.link_shared([obj], lib)
+      assert result, "expected skipped link_shared to return true"
+      assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
+    end
+  end
 end

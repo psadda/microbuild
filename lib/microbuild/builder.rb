@@ -46,36 +46,48 @@ module Microbuild
     end
 
     # Compiles a single source file into an object file.
+    # Skips compilation if +output_path+ already exists and is newer than
+    # +source_file_path+. Pass <tt>force: true</tt> to always recompile.
     #
     # @param source_file_path [String] path to the .c or .cpp source file
     # @param output_path      [String] path for the resulting object file
     # @param flags            [Array<String>] extra compiler flags
     # @param include_paths    [Array<String>] directories to add with -I
     # @param definitions      [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
-    # @return [Boolean] true if compilation succeeded, false otherwise
-    def compile(source_file_path, output_path, flags: [], include_paths: [], definitions: [])
+    # @param force            [Boolean] when true, always compile even if output is up-to-date
+    # @return [Boolean] true if compilation succeeded (or was skipped), false otherwise
+    def compile(source_file_path, output_path, flags: [], include_paths: [], definitions: [], force: false)
+      return true if !force && up_to_date?(output_path, [source_file_path])
       cmd = build_compile_command(source_file_path, output_path, flags, include_paths, definitions)
       run_command(cmd)
     end
 
     # Links one or more object files into an executable.
+    # Skips linking if +output_path+ already exists and is newer than all
+    # +object_file_paths+. Pass <tt>force: true</tt> to always re-link.
     #
     # @param object_file_paths [Array<String>] paths to the object files to link
     # @param output_path       [String] path for the resulting executable
-    # @return [Boolean] true if linking succeeded, false otherwise
-    def link_executable(object_file_paths, output_path)
+    # @param force             [Boolean] when true, always link even if output is up-to-date
+    # @return [Boolean] true if linking succeeded (or was skipped), false otherwise
+    def link_executable(object_file_paths, output_path, force: false)
+      return true if !force && up_to_date?(output_path, object_file_paths)
       run_command(build_link_executable_command(object_file_paths, output_path))
     end
 
     # Archives one or more object files into a static library.
     # Uses +ar rcs+ on Unix (plus +ranlib+ if detected) and +lib+ on MSVC.
+    # Skips archiving if +output_path+ is already up-to-date. Pass
+    # <tt>force: true</tt> to always re-archive.
     # Returns false if the archiver (+ar+ / +lib+) is not available.
     #
     # @param object_file_paths [Array<String>] paths to the object files
     # @param output_path       [String] path for the resulting static library
-    # @return [Boolean] true if archiving succeeded, false otherwise
-    def link_static(object_file_paths, output_path)
+    # @param force             [Boolean] when true, always archive even if output is up-to-date
+    # @return [Boolean] true if archiving succeeded (or was skipped), false otherwise
+    def link_static(object_file_paths, output_path, force: false)
       return false unless compiler.ar
+      return true if !force && up_to_date?(output_path, object_file_paths)
 
       if compiler.type == :msvc
         run_command([compiler.ar, "/OUT:#{output_path}", *object_file_paths])
@@ -87,11 +99,15 @@ module Microbuild
     end
 
     # Links one or more object files into a shared library.
+    # Skips linking if +output_path+ already exists and is newer than all
+    # +object_file_paths+. Pass <tt>force: true</tt> to always re-link.
     #
     # @param object_file_paths [Array<String>] paths to the object files to link
     # @param output_path       [String] path for the resulting shared library
-    # @return [Boolean] true if linking succeeded, false otherwise
-    def link_shared(object_file_paths, output_path)
+    # @param force             [Boolean] when true, always link even if output is up-to-date
+    # @return [Boolean] true if linking succeeded (or was skipped), false otherwise
+    def link_shared(object_file_paths, output_path, force: false)
+      return true if !force && up_to_date?(output_path, object_file_paths)
       run_command(build_link_shared_command(object_file_paths, output_path))
     end
 
@@ -166,6 +182,15 @@ module Microbuild
       @log << entry
       @stdout_sink.write(stdout) if @stdout_sink.respond_to?(:write)
       @stderr_sink.write(stderr) if @stderr_sink.respond_to?(:write)
+    end
+
+    # Returns true if +output_path+ exists and its mtime is newer than every
+    # file in +input_paths+. Returns false if the output is missing, if any
+    # input is missing, or if any input is as new as or newer than the output.
+    def up_to_date?(output_path, input_paths)
+      return false unless File.exist?(output_path)
+      output_mtime = File.mtime(output_path)
+      input_paths.all? { |p| File.exist?(p) && File.mtime(p) < output_mtime }
     end
   end
 end
