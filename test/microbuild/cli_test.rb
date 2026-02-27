@@ -133,6 +133,7 @@ class CLITest < Minitest::Test
     cli = Microbuild::CLI.new
     Microbuild::CLI::LONG_FLAG_MAP.each do |name, sym|
       options, _sources = cli.parse_compile_args(["--#{name}", "main.c"])
+
       assert_includes options[:flags], sym, "--#{name} should produce :#{sym}"
     end
   end
@@ -273,6 +274,7 @@ class CLITest < Minitest::Test
 
   # A stub that records Driver#compile / link_* calls without running subprocesses.
   class StubDriver
+
     attr_reader :calls
 
     def initialize
@@ -298,10 +300,12 @@ class CLITest < Minitest::Test
       @calls << { method: :link_shared, objects:, output: }
       true
     end
+
   end
 
   # A CLI subclass that injects a StubDriver so no subprocess calls are made.
   class TestCLI < Microbuild::CLI
+
     attr_reader :stub_driver
 
     private
@@ -309,6 +313,7 @@ class CLITest < Minitest::Test
     def build_driver
       @stub_driver = StubDriver.new
     end
+
   end
 
   def test_run_c_dispatches_compile_with_output
@@ -316,6 +321,7 @@ class CLITest < Minitest::Test
     cli.run(["c", "-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
+
     assert_equal :compile, call[:method]
     assert_equal "main.c",  call[:source]
     assert_equal "main.o",  call[:output]
@@ -334,6 +340,7 @@ class CLITest < Minitest::Test
     cli.run(["c", "-O2", "--avx", "--debug", "-o", "main.o", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
+
     assert_includes flags, :o2
     assert_includes flags, :avx
     assert_includes flags, :debug
@@ -344,7 +351,8 @@ class CLITest < Minitest::Test
     cli.run(["c", "-i", "/inc", "-d", "FOO=1", "-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
-    assert_equal ["/inc"],   call[:include_paths]
+
+    assert_equal ["/inc"], call[:include_paths]
     assert_equal ["FOO=1"], call[:definitions]
   end
 
@@ -353,6 +361,7 @@ class CLITest < Minitest::Test
     cli.run(["c", "--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "main.o", "main.c"])
 
     xflags = cli.stub_driver.calls.first[:xflags]
+
     assert_equal ["Z7", "/EHc"], xflags[:msvc]
   end
 
@@ -368,6 +377,7 @@ class CLITest < Minitest::Test
     cli.run(["link", "executable", "-o", "myapp", "a.o", "b.o"])
 
     call = cli.stub_driver.calls.first
+
     assert_equal :link_executable, call[:method]
     assert_equal ["a.o", "b.o"],   call[:objects]
     assert_equal "myapp",          call[:output]

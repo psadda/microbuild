@@ -23,8 +23,6 @@ Layout/EmptyLinesAroundClassBody:
   EnforcedStyle: empty_lines
 Layout/EmptyLinesAroundModuleBody:
   EnforcedStyle: empty_lines
-Layout/ElseAlignment:
-  Enabled: false
 Layout/ExtraSpacing:
   AllowBeforeTrailingComments: true
 Layout/HashAlignment:
