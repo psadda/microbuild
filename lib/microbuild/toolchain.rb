@@ -239,7 +239,7 @@ module Microbuild
     # returned devenv.exe path and runs it so that cl.exe and related tools
     # become available on PATH.
     def setup_msvc_environment
-      return if command_available?("cl")
+      return if command_available?(@c)
 
       devenv_path = run_vswhere("-path", "-property", "productPath") ||
                     run_vswhere("-latest", "-prerelease", "-property", "productPath")
@@ -309,19 +309,15 @@ module Microbuild
       @ar   = "lib" if command_available?("lib")
     end
 
-    private
+    CLANG_CL_FLAGS = UniversalFlags.new(
+        **MSVC_FLAGS.merge(
+            o3:  ["/Ot"],         # Clang-CL treats /Ot as -O3
+            lto: ["-flto=thin"],
+          )
+      ).freeze
 
-    def setup_msvc_environment
-      return if command_available?("clang-cl")
-
-      devenv_path = run_vswhere("-path", "-property", "productPath") ||
-                    run_vswhere("-latest", "-prerelease", "-property", "productPath")
-      return unless devenv_path
-
-      vcvarsall = find_vcvarsall(devenv_path)
-      return unless vcvarsall
-
-      run_vcvarsall(vcvarsall)
+    def flags
+      CLANG_CL_FLAGS
     end
 
   end
