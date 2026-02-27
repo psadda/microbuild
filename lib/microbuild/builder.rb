@@ -1,6 +1,7 @@
 require "open3"
 
 module Microbuild
+
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end
 
@@ -11,19 +12,20 @@ module Microbuild
   #   ld     – command used to link executables and shared libraries
   #   ar     – command used to create static libraries (nil if not found)
   #   ranlib – command used to index static libraries (nil if not found)
-  CompilerInfo = Struct.new(:type, :c, :cxx, :ld, :ar, :ranlib)
+  ToolchainInfo = Struct.new(:type, :c, :cxx, :ld, :ar, :ranlib)
 
   # Builder wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
+
     # Ordered list of compiler candidates to probe.
-    COMPILER_CANDIDATES = [
+    TOOLCHAIN_CANDIDATES = [
       { type: :clang, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
       { type: :gcc,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
       { type: :msvc,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
     ].freeze
 
-    # The detected toolchain (a CompilerInfo struct).
+    # The detected toolchain (a ToolchainInfo struct).
     attr_reader :compiler
 
     # Accumulated log entries from all compile/link invocations.
@@ -137,11 +139,11 @@ module Microbuild
     private
 
     def detect_compiler!
-      COMPILER_CANDIDATES.each do |candidate|
+      TOOLCHAIN_CANDIDATES.each do |candidate|
         next unless command_available?(candidate[:c])
         ar     = candidate[:ar]     if command_available?(candidate[:ar])
         ranlib = candidate[:ranlib] if command_available?(candidate[:ranlib])
-        return CompilerInfo.new(candidate[:type], candidate[:c], candidate[:cxx],
+        return ToolchainInfo.new(candidate[:type], candidate[:c], candidate[:cxx],
                                 candidate[:ld], ar, ranlib)
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
@@ -221,5 +223,7 @@ module Microbuild
       output_mtime = File.mtime(output_path)
       input_paths.all? { |p| File.exist?(p) && File.mtime(p) < output_mtime }
     end
+
   end
+
 end
