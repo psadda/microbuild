@@ -159,7 +159,8 @@ module Microbuild
     def setup_msvc_environment
       return if command_available?("cl")
 
-      devenv_path = find_msvc_via_vswhere
+      devenv_path = run_vswhere("-path", "-products", "*", "-property", "productPath") ||
+                    run_vswhere("-latest", "-products", "*", "-prerelease", "-property", "productPath")
       return unless devenv_path
 
       vcvarsall = find_vcvarsall(devenv_path)
@@ -168,25 +169,10 @@ module Microbuild
       run_vcvarsall(vcvarsall)
     end
 
-    # Queries vswhere.exe for a VS installation using a two-step strategy:
-    # first for instances already on PATH, then for the latest available
-    # instance (including prereleases).  Returns the path to devenv.exe,
-    # or nil if vswhere is absent or reports no matching installation.
-    def find_msvc_via_vswhere
-      return nil unless vswhere_available?
-
-      query_vswhere("-path", "-products", "*", "-property", "productPath") ||
-        query_vswhere("-latest", "-products", "*", "-prerelease", "-property", "productPath")
-    end
-
-    # Returns true when vswhere.exe exists at its default installer location.
-    def vswhere_available?
-      File.exist?(VSWHERE_PATH)
-    end
-
     # Runs vswhere.exe with the given arguments and returns the trimmed stdout,
-    # or nil if the command fails or produces no output.
-    def query_vswhere(*args)
+    # or nil if vswhere.exe is absent, the command fails, or produces no output.
+    def run_vswhere(*args)
+      return nil unless File.exist?(VSWHERE_PATH)
       stdout, _, status = Open3.capture3(VSWHERE_PATH, *args)
       return nil unless status.success?
       path = stdout.strip

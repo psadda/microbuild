@@ -21,11 +21,10 @@ class MsvcToolchainTest < Minitest::Test
         cl_on_path && (cmd == "cl" || cmd == "link")
       end
 
-      # Prevent real vswhere calls unless overridden.
-      def vswhere_available? = false
-      def query_vswhere(*)   = nil
-      def find_vcvarsall(*)  = nil
-      def run_vcvarsall(*)   = nil
+      # Prevent real vswhere/vcvarsall calls unless overridden.
+      def run_vswhere(*)   = nil
+      def find_vcvarsall(*) = nil
+      def run_vcvarsall(*) = nil
     end
     klass.class_eval(&block) if block
     klass
@@ -38,9 +37,9 @@ class MsvcToolchainTest < Minitest::Test
   def test_setup_skips_vswhere_when_cl_already_available
     vswhere_called = false
     klass = stub_msvc_class(cl_on_path: true) do
-      define_method(:vswhere_available?) do
+      define_method(:run_vswhere) do |*args|
         vswhere_called = true
-        false
+        nil
       end
     end
     klass.new
@@ -54,26 +53,25 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # find_msvc_via_vswhere: returns nil when vswhere.exe is absent
+  # run_vswhere: returns nil when vswhere.exe is absent
   # ---------------------------------------------------------------------------
 
-  def test_find_msvc_returns_nil_when_vswhere_absent
-    klass = stub_msvc_class do
-      def vswhere_available? = false
+  def test_run_vswhere_returns_nil_when_vswhere_absent
+    tc = Microbuild::MsvcToolchain.allocate
+
+    File.stub(:exist?, false) do
+      assert_nil tc.send(:run_vswhere, "-path", "-products", "*", "-property", "productPath")
     end
-    tc = klass.new
-    assert_nil tc.send(:find_msvc_via_vswhere)
   end
 
   # ---------------------------------------------------------------------------
-  # find_msvc_via_vswhere: two-step query order
+  # setup_msvc_environment: two-step vswhere query order
   # ---------------------------------------------------------------------------
 
-  def test_find_msvc_queries_path_flag_first
+  def test_setup_queries_path_flag_first
     queries = []
     klass = stub_msvc_class do
-      def vswhere_available? = true
-      define_method(:query_vswhere) do |*args|
+      define_method(:run_vswhere) do |*args|
         queries << args
         nil
       end
@@ -84,11 +82,10 @@ class MsvcToolchainTest < Minitest::Test
                  "first query must use the -path flag"
   end
 
-  def test_find_msvc_falls_back_to_latest_when_path_returns_nil
+  def test_setup_falls_back_to_latest_when_path_returns_nil
     queries = []
     klass = stub_msvc_class do
-      def vswhere_available? = true
-      define_method(:query_vswhere) do |*args|
+      define_method(:run_vswhere) do |*args|
         queries << args
         nil  # both queries return nil
       end
@@ -100,11 +97,10 @@ class MsvcToolchainTest < Minitest::Test
     assert_includes second, "-prerelease", "second query must include -prerelease"
   end
 
-  def test_find_msvc_returns_path_result_without_trying_latest
+  def test_setup_stops_after_path_query_succeeds
     queries = []
     klass = stub_msvc_class do
-      def vswhere_available? = true
-      define_method(:query_vswhere) do |*args|
+      define_method(:run_vswhere) do |*args|
         queries << args
         # Only the -path query succeeds.
         args.include?("-path") ? "/fake/VS/Common7/IDE/devenv.exe" : nil
@@ -112,21 +108,21 @@ class MsvcToolchainTest < Minitest::Test
     end
     klass.new
     assert_equal 1, queries.size, "should stop after the -path query succeeds"
-    result = queries.first
-    assert_equal ["-path", "-products", "*", "-property", "productPath"], result
+    assert_equal ["-path", "-products", "*", "-property", "productPath"], queries.first
   end
 
-  def test_find_msvc_returns_latest_when_path_query_fails
+  def test_setup_uses_latest_result_when_path_query_fails
     latest_devenv = "/fake/VS/Common7/IDE/devenv.exe"
+    vcvarsall_arg = nil
     klass = stub_msvc_class do
-      def vswhere_available? = true
-      define_method(:query_vswhere) do |*args|
+      define_method(:run_vswhere) do |*args|
         args.include?("-latest") ? latest_devenv : nil
       end
-      define_method(:find_vcvarsall) { |_| nil }
+      define_method(:find_vcvarsall) { |path| vcvarsall_arg = path; nil }
     end
-    tc = klass.new
-    assert_equal latest_devenv, tc.send(:find_msvc_via_vswhere)
+    klass.new
+    assert_equal latest_devenv, vcvarsall_arg,
+                 "find_vcvarsall should be called with the latest devenv path"
   end
 
   # ---------------------------------------------------------------------------
@@ -204,8 +200,7 @@ class MsvcToolchainTest < Minitest::Test
     setup_done = false
 
     klass = stub_msvc_class do
-      define_method(:vswhere_available?) { true }
-      define_method(:query_vswhere) do |*args|
+      define_method(:run_vswhere) do |*args|
         args.include?("-path") ? "/fake/VS/Common7/IDE/devenv.exe" : nil
       end
       define_method(:find_vcvarsall) { |_| "/fake/VS/VC/Auxiliary/Build/vcvarsall.bat" }
@@ -220,3 +215,4 @@ class MsvcToolchainTest < Minitest::Test
   end
 
 end
+
