@@ -2,6 +2,261 @@ require "test_helper"
 require "securerandom"
 require "tmpdir"
 require "fileutils"
+require "microbuild/toolchain"
+
+# ---------------------------------------------------------------------------
+# UniversalFlags tests
+# ---------------------------------------------------------------------------
+
+class UniversalFlagsTest < Minitest::Test
+
+  def test_all_attributes_default_to_empty_array
+    f = Microbuild::UniversalFlags.new
+    Microbuild::UniversalFlags::ATTRIBUTES.each do |attr|
+      assert_equal [], f.public_send(attr), "Expected #{attr} to default to []"
+    end
+  end
+
+  def test_provided_values_are_stored
+    f = Microbuild::UniversalFlags.new(o0: ["-O0"], warn_all: ["-Wall", "-Wextra"])
+    assert_equal ["-O0"], f.o0
+    assert_equal ["-Wall", "-Wextra"], f.warn_all
+  end
+
+  def test_unspecified_attributes_remain_empty
+    f = Microbuild::UniversalFlags.new(o2: ["-O2"])
+    assert_equal [], f.o3
+    assert_equal [], f.debug
+  end
+
+end
+
+# ---------------------------------------------------------------------------
+# GnuToolchain#flags tests
+# ---------------------------------------------------------------------------
+
+class GnuToolchainFlagsTest < Minitest::Test
+
+  def setup
+    klass = Class.new(Microbuild::GnuToolchain) do
+      def command_available?(*) = false
+    end
+    @tc = klass.new
+    @f  = @tc.flags
+  end
+
+  def test_flags_returns_universal_flags_instance
+    assert_instance_of Microbuild::UniversalFlags, @f
+  end
+
+  def test_o0
+    assert_equal ["-O0"], @f.o0
+  end
+
+  def test_o2
+    assert_equal ["-O2"], @f.o2
+  end
+
+  def test_o3
+    assert_equal ["-O3"], @f.o3
+  end
+
+  def test_avx
+    assert_equal ["-mavx"], @f.avx
+  end
+
+  def test_avx2
+    assert_equal ["-mavx2"], @f.avx2
+  end
+
+  def test_avx512
+    assert_equal ["-mavx512f"], @f.avx512
+  end
+
+  def test_sse4_1
+    assert_equal ["-msse4.1"], @f.sse4_1
+  end
+
+  def test_sse4_2
+    assert_equal ["-msse4.2"], @f.sse4_2
+  end
+
+  def test_debug
+    assert_equal ["-g"], @f.debug
+  end
+
+  def test_lto_thin
+    assert_equal ["-flto"], @f.lto_thin
+  end
+
+  def test_warn_all
+    assert_equal ["-Wall", "-Wextra", "-pedantic"], @f.warn_all
+  end
+
+  def test_warn_error
+    assert_equal ["-Werror"], @f.warn_error
+  end
+
+  def test_c_standards
+    assert_equal ["-std=c11"],  @f.c11
+    assert_equal ["-std=c17"],  @f.c17
+    assert_equal ["-std=c23"],  @f.c23
+  end
+
+  def test_cxx_standards
+    assert_equal ["-std=c++11"], @f.cxx11
+    assert_equal ["-std=c++14"], @f.cxx14
+    assert_equal ["-std=c++17"], @f.cxx17
+    assert_equal ["-std=c++20"], @f.cxx20
+    assert_equal ["-std=c++23"], @f.cxx23
+  end
+
+  def test_sanitizers
+    assert_equal ["-fsanitize=address"],   @f.asan
+    assert_equal ["-fsanitize=undefined"], @f.ubsan
+    assert_equal ["-fsanitize=memory"],    @f.msan
+  end
+
+  def test_extra_flags
+    assert_equal ["-ffast-math"],    @f.fast_math
+    assert_equal ["-fno-rtti"],      @f.rtti_off
+    assert_equal ["-fno-exceptions"],@f.exceptions_off
+    assert_equal ["-fPIC"],          @f.pic
+  end
+
+end
+
+# ---------------------------------------------------------------------------
+# ClangToolchain#flags tests – only the differences from GNU
+# ---------------------------------------------------------------------------
+
+class ClangToolchainFlagsTest < Minitest::Test
+
+  def setup
+    klass = Class.new(Microbuild::ClangToolchain) do
+      def command_available?(*) = false
+    end
+    @f = klass.new.flags
+  end
+
+  def test_flags_returns_universal_flags_instance
+    assert_instance_of Microbuild::UniversalFlags, @f
+  end
+
+  def test_lto_thin_uses_flto_equals_thin
+    assert_equal ["-flto=thin"], @f.lto_thin
+  end
+
+  def test_other_flags_match_gnu
+    assert_equal ["-O3"],             @f.o3
+    assert_equal ["-mavx"],           @f.avx
+    assert_equal ["-Wall", "-Wextra", "-pedantic"], @f.warn_all
+    assert_equal ["-std=c++17"],      @f.cxx17
+    assert_equal ["-fsanitize=address"], @f.asan
+  end
+
+end
+
+# ---------------------------------------------------------------------------
+# MsvcToolchain#flags tests
+# ---------------------------------------------------------------------------
+
+class MsvcToolchainFlagsTest < Minitest::Test
+
+  def setup
+    klass = Class.new(Microbuild::MsvcToolchain) do
+      def command_available?(*) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end
+    @f = klass.new.flags
+  end
+
+  def test_flags_returns_universal_flags_instance
+    assert_instance_of Microbuild::UniversalFlags, @f
+  end
+
+  def test_o0
+    assert_equal ["/Od"], @f.o0
+  end
+
+  def test_o2
+    assert_equal ["/O2"], @f.o2
+  end
+
+  def test_o3
+    assert_equal ["/O2", "/Ob3"], @f.o3
+  end
+
+  def test_avx
+    assert_equal ["/arch:AVX"], @f.avx
+  end
+
+  def test_avx2
+    assert_equal ["/arch:AVX2"], @f.avx2
+  end
+
+  def test_avx512
+    assert_equal ["/arch:AVX512"], @f.avx512
+  end
+
+  def test_sse4_1
+    assert_equal ["/arch:AVX"], @f.sse4_1
+  end
+
+  def test_sse4_2
+    assert_equal ["/arch:AVX"], @f.sse4_2
+  end
+
+  def test_debug
+    assert_equal ["/Zi"], @f.debug
+  end
+
+  def test_lto_thin
+    assert_equal ["/GL"], @f.lto_thin
+  end
+
+  def test_warn_all
+    assert_equal ["/W4"], @f.warn_all
+  end
+
+  def test_warn_error
+    assert_equal ["/WX"], @f.warn_error
+  end
+
+  def test_c_standards
+    assert_equal ["/std:c11"],     @f.c11
+    assert_equal ["/std:c17"],     @f.c17
+    assert_equal ["/std:clatest"], @f.c23
+  end
+
+  def test_cxx_standards
+    assert_equal [],                @f.cxx11
+    assert_equal ["/std:c++14"],    @f.cxx14
+    assert_equal ["/std:c++17"],    @f.cxx17
+    assert_equal ["/std:c++20"],    @f.cxx20
+    assert_equal ["/std:c++latest"],@f.cxx23
+  end
+
+  def test_asan
+    assert_equal ["/fsanitize=address"], @f.asan
+  end
+
+  def test_ubsan_and_msan_have_no_equivalent
+    assert_equal [], @f.ubsan
+    assert_equal [], @f.msan
+  end
+
+  def test_extra_flags
+    assert_equal ["/fp:fast"],        @f.fast_math
+    assert_equal ["/GR-"],            @f.rtti_off
+    assert_equal ["/EHs-", "/EHc-"], @f.exceptions_off
+    assert_equal [],                  @f.pic
+  end
+
+end
+
+
 
 class MsvcToolchainTest < Minitest::Test
 
