@@ -99,14 +99,7 @@ module Microbuild
       cmds
     end
 
-    def flags
-      UniversalFlags.new(**gnu_like_flags)
-    end
-
-    private
-
-    def gnu_like_flags
-      {
+    GNU_LIKE_FLAGS = {
         o0:            ["-O0"],
         o1:            ["-O1"],
         o2:            ["-O2"],
@@ -115,7 +108,7 @@ module Microbuild
         avx2:          ["-march=x86-64-v3"],
         avx512:        ["-mavx512f"],
         sse4_2:        ["-msse4.2"],
-        debug:         ["-g"],
+        debug:         ["-g3"],
         lto:           ["-flto"],
         warn_all:      ["-Wall", "-Wextra", "-pedantic"],
         warn_error:    ["-Werror"],
@@ -127,13 +120,19 @@ module Microbuild
         cxx17:         ["-std=c++17"],
         cxx20:         ["-std=c++20"],
         cxx23:         ["-std=c++23"],
+        cxx26:         ["-std=c++2c"],
         asan:          ["-fsanitize=address"],
         ubsan:         ["-fsanitize=undefined"],
         msan:          ["-fsanitize=memory"],
         no_rtti:       ["-fno-rtti"],
         no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
         pic:           ["-fPIC"],
-      }
+      }.freeze
+
+    GCC_FLAGS = UniversalFlags.new(**gnu_like_flags).freeze
+
+    def flags
+      GCC_FLAGS
     end
 
   end
@@ -150,8 +149,10 @@ module Microbuild
       @ranlib = "ranlib" if command_available?("ranlib")
     end
 
+    CLANG_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS.merge(lto: ["-flto=thin"])).freeze
+  
     def flags
-      UniversalFlags.new(**gnu_like_flags.merge(lto: ["-flto=thin"]))
+      CLANG_FLAGS
     end
 
   end
@@ -192,8 +193,7 @@ module Microbuild
       [[ar, "/OUT:#{output}", *object_files]]
     end
 
-    def flags
-      UniversalFlags.new(
+    MSVC_FLAGS = UniversalFlags.new(
         o0:            ["/Od"],
         o1:            ["/O1"],
         o2:            ["/O2"],
@@ -213,14 +213,18 @@ module Microbuild
         cxx14:         ["/std:c++14"],
         cxx17:         ["/std:c++17"],
         cxx20:         ["/std:c++20"],
-        cxx23:         ["/std:c++latest"],
+        cxx23:         ["/std:c++23preview"],
+        cxx26:         ["/std:c++latest"],
         asan:          ["/fsanitize=address"],
         ubsan:         [],
         msan:          [],
         no_rtti:       ["/GR-"],
         no_exceptions: ["/EHs-", "/EHc-"],
         pic:           [],
-      )
+      ).freeze
+
+    def flags
+      MSVC_FLAGS
     end
 
     private
