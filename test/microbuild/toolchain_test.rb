@@ -66,27 +66,19 @@ class GnuToolchainFlagsTest < Minitest::Test
   end
 
   def test_avx2
-    assert_equal ["-mavx2"], @f.avx2
+    assert_equal ["-march=x86-64-v3"], @f.avx2
   end
 
   def test_avx512
     assert_equal ["-mavx512f"], @f.avx512
   end
 
-  def test_sse4_1
-    assert_equal ["-msse4.1"], @f.sse4_1
-  end
-
-  def test_sse4_2
-    assert_equal ["-msse4.2"], @f.sse4_2
-  end
-
   def test_debug
     assert_equal ["-g"], @f.debug
   end
 
-  def test_lto_thin
-    assert_equal ["-flto"], @f.lto_thin
+  def test_lto
+    assert_equal ["-flto"], @f.lto
   end
 
   def test_warn_all
@@ -118,10 +110,9 @@ class GnuToolchainFlagsTest < Minitest::Test
   end
 
   def test_extra_flags
-    assert_equal ["-ffast-math"],    @f.fast_math
-    assert_equal ["-fno-rtti"],      @f.rtti_off
-    assert_equal ["-fno-exceptions"],@f.exceptions_off
-    assert_equal ["-fPIC"],          @f.pic
+    assert_equal ["-fno-rtti"],                       @f.no_rtti
+    assert_equal ["-fno-exceptions", "-fno-unwind-tables"], @f.no_exceptions
+    assert_equal ["-fPIC"],                           @f.pic
   end
 
 end
@@ -143,13 +134,14 @@ class ClangToolchainFlagsTest < Minitest::Test
     assert_instance_of Microbuild::UniversalFlags, @f
   end
 
-  def test_lto_thin_uses_flto_equals_thin
-    assert_equal ["-flto=thin"], @f.lto_thin
+  def test_lto_uses_flto_equals_thin
+    assert_equal ["-flto=thin"], @f.lto
   end
 
   def test_other_flags_match_gnu
     assert_equal ["-O3"],             @f.o3
     assert_equal ["-mavx"],           @f.avx
+    assert_equal ["-march=x86-64-v3"], @f.avx2
     assert_equal ["-Wall", "-Wextra", "-pedantic"], @f.warn_all
     assert_equal ["-std=c++17"],      @f.cxx17
     assert_equal ["-fsanitize=address"], @f.asan
@@ -200,20 +192,12 @@ class MsvcToolchainFlagsTest < Minitest::Test
     assert_equal ["/arch:AVX512"], @f.avx512
   end
 
-  def test_sse4_1
-    assert_equal ["/arch:AVX"], @f.sse4_1
-  end
-
-  def test_sse4_2
-    assert_equal ["/arch:AVX"], @f.sse4_2
-  end
-
   def test_debug
     assert_equal ["/Zi"], @f.debug
   end
 
-  def test_lto_thin
-    assert_equal ["/GL"], @f.lto_thin
+  def test_lto
+    assert_equal ["/GL"], @f.lto
   end
 
   def test_warn_all
@@ -248,9 +232,8 @@ class MsvcToolchainFlagsTest < Minitest::Test
   end
 
   def test_extra_flags
-    assert_equal ["/fp:fast"],        @f.fast_math
-    assert_equal ["/GR-"],            @f.rtti_off
-    assert_equal ["/EHs-", "/EHc-"], @f.exceptions_off
+    assert_equal ["/GR-"],            @f.no_rtti
+    assert_equal ["/EHs-", "/EHc-"], @f.no_exceptions
     assert_equal [],                  @f.pic
   end
 
