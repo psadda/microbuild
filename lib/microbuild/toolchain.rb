@@ -102,34 +102,34 @@ module Microbuild
     end
 
     GNU_FLAGS = {
-      o0: ["-O0"],
-      o1: ["-O1"],
-      o2: ["-O2"],
-      o3: ["-O3"],
-      sse4_2: ["-march=x86-64-v2"], # This is a better match for /arch:SSE4.2 than -msse4_2 is
-      avx: ["-march=x86-64-v2", "-mavx"],
-      avx2: ["-march=x86-64-v3"], # This is a better match for /arch:AVX2 than -mavx2 is
-      avx512: ["-march=x86-64-v4"],
-      native: ["-march=native", "-mtune=native"],
-      debug: ["-g3"],
-      lto: ["-flto"],
-      warn_all: ["-Wall", "-Wextra", "-pedantic"],
-      warn_error: ["-Werror"],
-      c11: ["-std=c11"],
-      c17: ["-std=c17"],
-      c23: ["-std=c23"],
-      cxx11: ["-std=c++11"],
-      cxx14: ["-std=c++14"],
-      cxx17: ["-std=c++17"],
-      cxx20: ["-std=c++20"],
-      cxx23: ["-std=c++23"],
-      cxx26: ["-std=c++2c"],
-      asan: ["-fsanitize=address"],
-      ubsan: ["-fsanitize=undefined"],
-      msan: ["-fsanitize=memory"],
-      no_rtti: ["-fno-rtti"],
+      o0:            ["-O0"],
+      o1:            ["-O1"],
+      o2:            ["-O2"],
+      o3:            ["-O3"],
+      sse4_2:        ["-march=x86-64-v2"], # This is a better match for /arch:SSE4.2 than -msse4_2 is
+      avx:           ["-march=x86-64-v2", "-mavx"],
+      avx2:          ["-march=x86-64-v3"], # This is a better match for /arch:AVX2 than -mavx2 is
+      avx512:        ["-march=x86-64-v4"],
+      native:        ["-march=native", "-mtune=native"],
+      debug:         ["-g3"],
+      lto:           ["-flto"],
+      warn_all:      ["-Wall", "-Wextra", "-pedantic"],
+      warn_error:    ["-Werror"],
+      c11:           ["-std=c11"],
+      c17:           ["-std=c17"],
+      c23:           ["-std=c23"],
+      cxx11:         ["-std=c++11"],
+      cxx14:         ["-std=c++14"],
+      cxx17:         ["-std=c++17"],
+      cxx20:         ["-std=c++20"],
+      cxx23:         ["-std=c++23"],
+      cxx26:         ["-std=c++2c"],
+      asan:          ["-fsanitize=address"],
+      ubsan:         ["-fsanitize=undefined"],
+      msan:          ["-fsanitize=memory"],
+      no_rtti:       ["-fno-rtti"],
       no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
-      pic: ["-fPIC"]
+      pic:           ["-fPIC"]
     }.freeze
 
     def flags
@@ -172,8 +172,8 @@ module Microbuild
       @c    = "cl"
       @cxx  = "cl"
       @ld   = "link"
+      @ar   = "lib"
       setup_msvc_environment
-      @ar = "lib" if command_available?("lib")
     end
 
     def compile_command(source, output, flags, include_paths, definitions)
@@ -195,34 +195,34 @@ module Microbuild
     end
 
     MSVC_FLAGS = {
-      o0: ["/Od"],
-      o1: ["/O1"],
-      o2: ["/O2"],
-      o3: ["/O2", "/Ob3"],
-      sse4_2: ["/arch:SSE4.2"],
-      avx: ["/arch:AVX"],
-      avx2: ["/arch:AVX2"],
-      avx512: ["/arch:AVX512"],
-      native: [],
-      debug: ["/Zi"],
-      lto: ["/GL"],
-      warn_all: ["/W4"],
-      warn_error: ["/WX"],
-      c11: ["/std:c11"],
-      c17: ["/std:c17"],
-      c23: ["/std:clatest"],
-      cxx11: [],
-      cxx14: ["/std:c++14"],
-      cxx17: ["/std:c++17"],
-      cxx20: ["/std:c++20"],
-      cxx23: ["/std:c++23preview"],
-      cxx26: ["/std:c++latest"],
-      asan: ["/fsanitize=address"],
-      ubsan: [],
-      msan: [],
-      no_rtti: ["/GR-"],
+      o0:            ["/Od"],
+      o1:            ["/O1"],
+      o2:            ["/O2"],
+      o3:            ["/O2", "/Ob3"],
+      sse4_2:        ["/arch:SSE4.2"],
+      avx:           ["/arch:AVX"],
+      avx2:          ["/arch:AVX2"],
+      avx512:        ["/arch:AVX512"],
+      native:        [],
+      debug:         ["/Zi"],
+      lto:           ["/GL"],
+      warn_all:      ["/W4"],
+      warn_error:    ["/WX"],
+      c11:           ["/std:c11"],
+      c17:           ["/std:c17"],
+      c23:           ["/std:clatest"],
+      cxx11:         [],
+      cxx14:         ["/std:c++14"],
+      cxx17:         ["/std:c++17"],
+      cxx20:         ["/std:c++20"],
+      cxx23:         ["/std:c++23preview"],
+      cxx26:         ["/std:c++latest"],
+      asan:          ["/fsanitize=address"],
+      ubsan:         [],
+      msan:          [],
+      no_rtti:       ["/GR-"],
       no_exceptions: ["/EHs-", "/EHc-"],
-      pic: []
+      pic:           []
     }.freeze
 
     def flags
@@ -310,8 +310,8 @@ module Microbuild
       @c    = "clang-cl"
       @cxx  = "clang-cl"
       @ld   = "link"
+      @ar   = "lib"
       setup_msvc_environment
-      @ar = "lib" if command_available?("lib")
     end
 
     CLANG_CL_FLAGS = MSVC_FLAGS.merge(

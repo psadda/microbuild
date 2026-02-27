@@ -1,5 +1,6 @@
 plugins:
  - rubocop-minitest
+ - rubocop-rake
 AllCops:
   TargetRubyVersion: 3.2
   NewCops: enable
@@ -24,11 +25,15 @@ Layout/EmptyLinesAroundModuleBody:
   EnforcedStyle: empty_lines
 Layout/ElseAlignment:
   Enabled: false
+Layout/ExtraSpacing:
+  AllowBeforeTrailingComments: true
+Layout/HashAlignment:
+  EnforcedColonStyle: table
 Metrics/AbcSize:
   Enabled: false
 Metrics/ClassLength:
   Enabled: false
 Metrics/MethodLength:
   Enabled: false
-Naming/MethodParameterName:
+Naming/VariableNumber:
   Enabled: false

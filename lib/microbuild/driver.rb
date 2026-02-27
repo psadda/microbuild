@@ -15,16 +15,18 @@ module Microbuild
     # Ordered list of toolchain classes to probe, in priority order.
     TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
 
-    RECOGNIZED_FLAGS = Set.new(%i[
-      o0 o1 o2 o3
-      sse4_2 avx avx2 avx512 native
-      debug lto
-      warn_all warn_error
-      c11 c17 c23
-      cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
-      asan ubsan msan
-      no_rtti no_exceptions pic
-    ]).freeze
+    RECOGNIZED_FLAGS = Set.new(
+      %i[
+        o0 o1 o2 o3
+        sse4_2 avx avx2 avx512 native
+        debug lto
+        warn_all warn_error
+        c11 c17 c23
+        cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
+        asan ubsan msan
+        no_rtti no_exceptions pic
+      ]
+    ).freeze
 
     # The detected toolchain (a Toolchain subclass instance).
     attr_reader :toolchain
@@ -155,6 +157,7 @@ module Microbuild
       if unrecognized_flag
         raise "#{unrecognized_flag.inspect} is not a known flag"
       end
+
       flags.flat_map { |flag| @toolchain.flags[flag] }
     end
 
