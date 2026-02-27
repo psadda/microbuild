@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require "open3"
-require_relative "universal_flags"
 
 module Microbuild
 
@@ -35,7 +34,7 @@ module Microbuild
       false
     end
 
-    # Returns a UniversalFlags instance with flag arrays for this toolchain.
+    # Returns a Hash mapping universal flags to native flags for this toolchain.
     def flags
       raise NotImplementedError, "#{self.class}#flags not implemented"
     end
@@ -102,7 +101,7 @@ module Microbuild
       cmds
     end
 
-    GNU_LIKE_FLAGS = {
+    GNU_FLAGS = {
       o0: ["-O0"],
       o1: ["-O1"],
       o2: ["-O2"],
@@ -133,10 +132,8 @@ module Microbuild
       pic: ["-fPIC"]
     }.freeze
 
-    GCC_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS).freeze
-
     def flags
-      GCC_FLAGS
+      GNU_FLAGS
     end
 
   end
@@ -153,7 +150,7 @@ module Microbuild
       @ranlib = "ranlib" if command_available?("ranlib")
     end
 
-    CLANG_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS, lto: ["-flto=thin"]).freeze
+    CLANG_FLAGS = GNU_FLAGS.merge(lto: ["-flto=thin"]).freeze
 
     def flags
       CLANG_FLAGS
@@ -197,7 +194,7 @@ module Microbuild
       [[ar, "/OUT:#{output}", *object_files]]
     end
 
-    MSVC_FLAGS = UniversalFlags.new(
+    MSVC_FLAGS = {
       o0: ["/Od"],
       o1: ["/O1"],
       o2: ["/O2"],
@@ -226,7 +223,7 @@ module Microbuild
       no_rtti: ["/GR-"],
       no_exceptions: ["/EHs-", "/EHc-"],
       pic: []
-    ).freeze
+    }.freeze
 
     def flags
       MSVC_FLAGS
@@ -317,9 +314,9 @@ module Microbuild
       @ar = "lib" if command_available?("lib")
     end
 
-    CLANG_CL_FLAGS = UniversalFlags.new(
-      **MSVC_FLAGS, o3: ["/Ot"], # Clang-CL treats /Ot as -O3
-                    lto: ["-flto=thin"]
+    CLANG_CL_FLAGS = MSVC_FLAGS.merge(
+      o3:  ["/Ot"],       # Clang-CL treats /Ot as -O3
+      lto: ["-flto=thin"]
     ).freeze
 
     def flags

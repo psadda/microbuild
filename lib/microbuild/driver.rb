@@ -15,6 +15,17 @@ module Microbuild
     # Ordered list of toolchain classes to probe, in priority order.
     TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
 
+    RECOGNIZED_FLAGS = Set.new(%i[
+      o0 o1 o2 o3
+      sse4_2 avx avx2 avx512 native
+      debug lto
+      warn_all warn_error
+      c11 c17 c23
+      cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
+      asan ubsan msan
+      no_rtti no_exceptions pic
+    ]).freeze
+
     # The detected toolchain (a Toolchain subclass instance).
     attr_reader :toolchain
 
@@ -50,7 +61,7 @@ module Microbuild
     #
     # @param source_file_path [String] path to the .c or .cpp source file
     # @param output_path      [String] path for the resulting object file
-    # @param flags            [Array<String>] extra compiler flags
+    # @param flags            [Array<Symbol>] extra compiler flags
     # @param include_paths    [Array<String>] directories to add with -I
     # @param definitions      [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
     # @param force            [Boolean] when true, always compile even if output is up-to-date
@@ -59,6 +70,8 @@ module Microbuild
     # @return [Boolean] true if compilation succeeded (or was skipped), false otherwise
     def compile(source_file_path, output_path, flags: [], include_paths: [], definitions: [],
                 force: false, env: {}, working_dir: ".")
+      flags = translate_flags(flags)
+
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
 
@@ -135,6 +148,14 @@ module Microbuild
         return tc if tc.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
+    end
+
+    def translate_flags(flags)
+      unrecognized_flag = flags.find { |flag| !RECOGNIZED_FLAGS.include?(flag) }
+      if unrecognized_flag
+        raise "#{unrecognized_flag.inspect} is not a known flag"
+      end
+      flags.flat_map { |flag| @toolchain.flags[flag] }
     end
 
     def toolchain_classes
