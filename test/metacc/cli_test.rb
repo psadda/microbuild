@@ -131,7 +131,7 @@ class CLITest < Minitest::Test
 
   def test_parse_compile_args_all_long_flag_map_flags
     cli = MetaCC::CLI.new
-    MetaCC::CLI::LONG_FLAG_MAP.each do |name, sym|
+    MetaCC::CLI::LONG_FLAGS.each do |name, sym|
       options, _sources = cli.parse_compile_args(["--#{name}", "main.c"])
 
       assert_includes options[:flags], sym, "--#{name} should produce :#{sym}"

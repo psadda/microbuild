@@ -33,7 +33,7 @@ module MetaCC
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
-    LONG_FLAG_MAP = {
+    LONG_FLAGS = {
       "lto"           => :lto,
       "asan"          => :asan,
       "ubsan"         => :ubsan,
@@ -130,7 +130,7 @@ module MetaCC
           options[:flags] << WARNING_CONFIGS[value]
         end
 
-        LONG_FLAG_MAP.each do |name, sym|
+        LONG_FLAGS.each do |name, sym|
           opts.on("--#{name}") { options[:flags] << sym }
         end
 
