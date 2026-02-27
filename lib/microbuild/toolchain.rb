@@ -159,8 +159,8 @@ module Microbuild
     def setup_msvc_environment
       return if command_available?("cl")
 
-      devenv_path = run_vswhere("-path", "-products", "*", "-property", "productPath") ||
-                    run_vswhere("-latest", "-products", "*", "-prerelease", "-property", "productPath")
+      devenv_path = run_vswhere("-path", "-property", "productPath") ||
+                    run_vswhere("-latest", "-prerelease", "-property", "productPath")
       return unless devenv_path
 
       vcvarsall = find_vcvarsall(devenv_path)
