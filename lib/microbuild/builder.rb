@@ -26,7 +26,7 @@ module Microbuild
     ].freeze
 
     # The detected toolchain (a ToolchainInfo struct).
-    attr_reader :compiler
+    attr_reader :toolchain
 
     # Accumulated log entries from all compile/link invocations.
     # Each entry is a Hash with :command, :stdout, and :stderr keys.
@@ -50,7 +50,7 @@ module Microbuild
       @stderr_sink = stderr_sink
       @output_dir = output_dir
       @log = []
-      @compiler = detect_compiler!
+      @toolchain = detect_compiler!
     end
 
     # Compiles a single source file into an object file.
@@ -106,15 +106,15 @@ module Microbuild
     # @param working_dir       [String] working directory for the subprocess (default: ".")
     # @return [Boolean] true if archiving succeeded (or was skipped), false otherwise
     def link_static(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
-      return false unless compiler.ar
+      return false unless toolchain.ar
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
 
-      if compiler.type == :msvc
-        run_command([compiler.ar, "/OUT:#{out}", *object_file_paths], env: env, working_dir: working_dir)
+      if toolchain.type == :msvc
+        run_command([toolchain.ar, "/OUT:#{out}", *object_file_paths], env: env, working_dir: working_dir)
       else
-        return false unless run_command([compiler.ar, "rcs", out, *object_file_paths], env: env, working_dir: working_dir)
-        return run_command([compiler.ranlib, out], env: env, working_dir: working_dir) if compiler.ranlib
+        return false unless run_command([toolchain.ar, "rcs", out, *object_file_paths], env: env, working_dir: working_dir)
+        return run_command([toolchain.ranlib, out], env: env, working_dir: working_dir) if toolchain.ranlib
         true
       end
     end
@@ -164,10 +164,10 @@ module Microbuild
     end
 
     def build_compile_command(source, output, flags, include_paths, definitions)
-      if compiler.type == :msvc
+      if toolchain.type == :msvc
         build_msvc_compile_command(source, output, flags, include_paths, definitions)
       else
-        cc = c_file?(source) ? compiler.c : compiler.cxx
+        cc = c_file?(source) ? toolchain.c : toolchain.cxx
         inc_flags = include_paths.map { |p| "-I#{p}" }
         def_flags = definitions.map  { |d| "-D#{d}" }
         [cc, *flags, *inc_flags, *def_flags, "-c", source, "-o", output]
@@ -177,22 +177,22 @@ module Microbuild
     def build_msvc_compile_command(source, output, flags, include_paths, definitions)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map  { |d| "/D#{d}" }
-      [compiler.c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
+      [toolchain.c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
     end
 
     def build_link_executable_command(object_files, output)
-      if compiler.type == :msvc
-        [compiler.ld, *object_files, "/OUT:#{output}"]
+      if toolchain.type == :msvc
+        [toolchain.ld, *object_files, "/OUT:#{output}"]
       else
-        [compiler.ld, *object_files, "-o", output]
+        [toolchain.ld, *object_files, "-o", output]
       end
     end
 
     def build_link_shared_command(object_files, output)
-      if compiler.type == :msvc
-        [compiler.ld, "/DLL", *object_files, "/OUT:#{output}"]
+      if toolchain.type == :msvc
+        [toolchain.ld, "/DLL", *object_files, "/OUT:#{output}"]
       else
-        [compiler.ld, "-shared", *object_files, "-o", output]
+        [toolchain.ld, "-shared", *object_files, "-o", output]
       end
     end
 
