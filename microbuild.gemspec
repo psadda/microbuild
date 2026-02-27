@@ -12,7 +12,8 @@ Gem::Specification.new do |spec|
   DESC
   spec.license       = "BSD-3-Clause"
 
-  spec.files         = Dir["lib/**/*.rb"]
+  spec.files         = Dir["lib/**/*.rb"] + Dir["bin/*"]
+  spec.executables   = ["microbuild"]
   spec.require_paths = ["lib"]
 
   spec.required_ruby_version = ">= 3.2"
