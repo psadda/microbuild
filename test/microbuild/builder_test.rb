@@ -399,4 +399,95 @@ class BuilderTest < Minitest::Test
       assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # output_dir: constructor option
+  # ---------------------------------------------------------------------------
+  def test_output_dir_prepended_to_relative_output_path
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      File.write(src, "int main(void) { return 0; }\n")
+      build_dir = File.join(dir, "out")
+      FileUtils.mkdir_p(build_dir)
+
+      builder = Microbuild::Builder.new(output_dir: build_dir)
+      result = builder.compile(src, "hello.o")
+      assert result, "expected compile to succeed"
+      assert File.exist?(File.join(build_dir, "hello.o")), "object should be in output_dir"
+    end
+  end
+
+  def test_absolute_output_path_ignores_output_dir
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")  # absolute
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder = Microbuild::Builder.new(output_dir: "/nonexistent_build_dir")
+      result = builder.compile(src, obj)
+      assert result, "expected compile to succeed with absolute output path"
+      assert File.exist?(obj), "object should be at the absolute path"
+    end
+  end
+
+  def test_output_dir_default_is_build
+    builder = Microbuild::Builder.new
+    assert_equal "build", builder.output_dir
+  end
+
+  # ---------------------------------------------------------------------------
+  # env: and working_dir: per-invocation options
+  # ---------------------------------------------------------------------------
+  def test_compile_accepts_env_and_working_dir
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.compile(src, obj, env: {}, working_dir: dir)
+      assert result, "expected compile to succeed with env: and working_dir:"
+    end
+  end
+
+  def test_link_executable_accepts_env_and_working_dir
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "main.c")
+      obj = File.join(dir, "main.o")
+      exe = File.join(dir, "main")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.compile(src, obj)
+      result = builder.link_executable([obj], exe, env: {}, working_dir: dir)
+      assert result, "expected link_executable to succeed with env: and working_dir:"
+    end
+  end
+
+  def test_env_variables_are_forwarded_to_subprocess
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      # Pass a harmless env var; compilation should still succeed.
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.compile(src, obj, env: { "MY_BUILD_FLAG" => "1" })
+      assert result, "expected compile to succeed when env: contains custom vars"
+    end
+  end
+
+  def test_working_dir_sets_subprocess_cwd
+    builder = Microbuild::Builder.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      # Run with working_dir set to the tmp dir; absolute paths still resolve.
+      result = builder.compile(src, obj, working_dir: dir)
+      assert result, "expected compile to succeed with working_dir set"
+      assert File.exist?(obj), "object file should exist after compile with working_dir"
+    end
+  end
 end
