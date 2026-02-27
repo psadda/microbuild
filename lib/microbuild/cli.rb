@@ -16,56 +16,64 @@ module Microbuild
   #
   # Recognised flags (passed to Driver#compile via flags:):
   #   -O0 -O1 -O2 -O3
-  #   --sse4_2 --avx --avx2 --avx512 --native
+  #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native
   #   --debug --lto
-  #   --warn_all --warn_error
-  #   --c11 --c17 --c23
-  #   --cxx11 --cxx14 --cxx17 --cxx20 --cxx23 --cxx26
+  #   -Wall -Werror
+  #   --std=c11 --std=c17 --std=c23
+  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26
   #   --asan --ubsan --msan
-  #   --no_rtti --no_exceptions --pic
+  #   --no-rtti --no-exceptions --pic
   #
   # Toolchain-specific flags (passed to Driver#compile via xflags:):
   #   --xmsvc VALUE     – appended to xflags[:msvc]
   #   --xgnu  VALUE     – appended to xflags[:gcc]
   #   --xclang VALUE    – appended to xflags[:clang]
-  #   --xclang_cl VALUE – appended to xflags[:clang_cl]
+  #   --xclangcl VALUE  – appended to xflags[:clang_cl]
   class CLI
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
-    LONG_FLAG_MAP = {
-      "sse4_2"        => :sse4_2,
-      "avx"           => :avx,
-      "avx2"          => :avx2,
-      "avx512"        => :avx512,
-      "native"        => :native,
-      "debug"         => :debug,
+    LONG_FLAGS = {
       "lto"           => :lto,
-      "warn_all"      => :warn_all,
-      "warn_error"    => :warn_error,
-      "c11"           => :c11,
-      "c17"           => :c17,
-      "c23"           => :c23,
-      "cxx11"         => :cxx11,
-      "cxx14"         => :cxx14,
-      "cxx17"         => :cxx17,
-      "cxx20"         => :cxx20,
-      "cxx23"         => :cxx23,
-      "cxx26"         => :cxx26,
       "asan"          => :asan,
       "ubsan"         => :ubsan,
       "msan"          => :msan,
-      "no_rtti"       => :no_rtti,
-      "no_exceptions" => :no_exceptions,
-      "pic"           => :pic,
+      "no-rtti"       => :no_rtti,
+      "no-exceptions" => :no_exceptions,
+      "pic"           => :pic
+    }.freeze
+
+    WARNING_CONFIGS = {
+      "all"      => :warn_all,
+      "error"    => :warn_error
+    }
+
+    TARGETS = {
+      "sse4.2"   => :sse4_2,
+      "avx"      => :avx,
+      "avx2"     => :avx2,
+      "avx512"   => :avx512,
+      "native"   => :native
+    }.freeze
+
+    STANDARDS = {
+      "c11"      => :c11,
+      "c17"      => :c17,
+      "c23"      => :c23,
+      "c++11"    => :cxx11,
+      "c++14"    => :cxx14,
+      "c++17"    => :cxx17,
+      "c++20"    => :cxx20,
+      "c++23"    => :cxx23,
+      "c++26"    => :cxx26
     }.freeze
 
     # Maps --x<name> CLI option names to xflags toolchain-type keys.
-    XFLAG_MAP = {
-      "xmsvc"     => :msvc,
-      "xgnu"      => :gcc,
-      "xclang"    => :clang,
-      "xclang_cl" => :clang_cl,
+    XFLAGS = {
+      "xmsvc"    => :msvc,
+      "xgnu"     => :gcc,
+      "xclang"   => :clang,
+      "xclangcl" => :clang_cl
     }.freeze
 
     def self.run(argv = ARGV)
@@ -97,24 +105,36 @@ module Microbuild
       options = { includes: [], defines: [], output: nil, flags: [], xflags: {} }
 
       parser = OptionParser.new do |opts|
-        opts.on("-i", "--include DIR", "Add an include search directory") do |v|
-          options[:includes] << v
+        opts.on("-o FILEPATH", "Output file path") do |value|
+          options[:output] = value
         end
-        opts.on("-d", "--define DEF", "Add a preprocessor definition") do |v|
-          options[:defines] << v
+        opts.on("-I", "--include DIRPATH", "Add an include search directory") do |value|
+          options[:includes] << value
         end
-        opts.on("-o OUTPUT", "Output file path") do |v|
-          options[:output] = v
+        opts.on("-D", "--define DEF", "Add a preprocessor definition") do |value|
+          options[:defines] << value
         end
         opts.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
           options[:flags] << :"o#{level}"
         end
+        opts.on("-m", "--arch ARCH", "Target architecture") do |value|
+          options[:flags] << TARGETS[value]
+        end
+        opts.on("-d", "--debug", "Emit debugging symbols") do
+          options[:flags] << :debug
+        end
+        opts.on("--std STANDARD", "Specify the language standard") do |value|
+          options[:flags] << STANDARDS[value]
+        end
+        opts.on("-W", "--warn OPTION", "Configure warnings") do |value|
+          options[:flags] << WARNING_CONFIGS[value]
+        end
 
-        LONG_FLAG_MAP.each do |name, sym|
+        LONG_FLAGS.each do |name, sym|
           opts.on("--#{name}") { options[:flags] << sym }
         end
 
-        XFLAG_MAP.each do |name, tc_sym|
+        XFLAGS.each do |name, tc_sym|
           opts.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_sym} toolchain") do |v|
             options[:xflags][tc_sym] ||= []
             options[:xflags][tc_sym] << v
@@ -139,7 +159,7 @@ module Microbuild
 
       options = { output: nil }
       parser = OptionParser.new do |opts|
-        opts.on("-o OUTPUT", "Output file path") { |v| options[:output] = v }
+        opts.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
       end
       objects = parser.parse(argv)
 
