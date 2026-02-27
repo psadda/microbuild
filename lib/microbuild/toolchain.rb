@@ -72,6 +72,7 @@ module Microbuild
   class GnuToolchain < Toolchain
 
     def initialize
+      super
       @type   = :gcc
       @c      = "gcc"
       @cxx    = "g++"
@@ -142,12 +143,11 @@ module Microbuild
   class ClangToolchain < GnuToolchain
 
     def initialize
+      super
       @type   = :clang
       @c      = "clang"
       @cxx    = "clang++"
       @ld     = "clang++"
-      @ar     = "ar"     if command_available?("ar")
-      @ranlib = "ranlib" if command_available?("ranlib")
     end
 
     CLANG_FLAGS = GNU_FLAGS.merge(lto: ["-flto=thin"]).freeze
@@ -167,13 +167,14 @@ module Microbuild
       "Microsoft Visual Studio", "Installer", "vswhere.exe"
     ).freeze
 
-    def initialize
+    def initialize(cl_command = "cl")
+      super
       @type = :msvc
-      @c    = "cl"
-      @cxx  = "cl"
+      @c    = cl_command
+      @cxx  = cl_command
       @ld   = "link"
       @ar   = "lib"
-      setup_msvc_environment
+      setup_msvc_environment(cl_command)
     end
 
     def compile_command(source, output, flags, include_paths, definitions)
@@ -240,8 +241,8 @@ module Microbuild
     # When a VS instance is found, locates vcvarsall.bat relative to the
     # returned devenv.exe path and runs it so that cl.exe and related tools
     # become available on PATH.
-    def setup_msvc_environment
-      return if command_available?(@c)
+    def setup_msvc_environment(cl_command)
+      return if command_available?(cl_command)
 
       devenv_path = run_vswhere("-path", "-property", "productPath") ||
                     run_vswhere("-latest", "-prerelease", "-property", "productPath")
@@ -306,12 +307,8 @@ module Microbuild
   class ClangClToolchain < MsvcToolchain
 
     def initialize
+      super("clang-cl")
       @type = :clang_cl
-      @c    = "clang-cl"
-      @cxx  = "clang-cl"
-      @ld   = "link"
-      @ar   = "lib"
-      setup_msvc_environment
     end
 
     CLANG_CL_FLAGS = MSVC_FLAGS.merge(
