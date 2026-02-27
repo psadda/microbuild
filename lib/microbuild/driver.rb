@@ -8,9 +8,9 @@ module Microbuild
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end
 
-  # Builder wraps C and C++ compile and link operations using the first
+  # Driver wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
-  class Builder
+  class Driver
 
     # Ordered list of toolchain classes to probe, in priority order.
     TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
