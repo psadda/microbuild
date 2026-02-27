@@ -108,6 +108,7 @@ module Microbuild
         avx:           ["-march=x86-64-v2", "-mavx"],
         avx2:          ["-march=x86-64-v3"], # This is a better match for /arch:AVX2 than -mavx2 is
         avx512:        ["-march=x86-64-v4"],
+        native:        ["-march=native", "-mtune=native"],
         debug:         ["-g3"],
         lto:           ["-flto"],
         warn_all:      ["-Wall", "-Wextra", "-pedantic"],
@@ -202,6 +203,7 @@ module Microbuild
         avx:           ["/arch:AVX"],
         avx2:          ["/arch:AVX2"],
         avx512:        ["/arch:AVX512"],
+        native:        [],
         debug:         ["/Zi"],
         lto:           ["/GL"],
         warn_all:      ["/W4"],
