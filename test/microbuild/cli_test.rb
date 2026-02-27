@@ -250,6 +250,49 @@ class CLITest < Minitest::Test
     end
   end
 
+  def test_parse_link_args_lib_short_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "main.o"])
+
+    assert_equal ["m"], options[:libs]
+  end
+
+  def test_parse_link_args_lib_long_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "--lib", "pthread", "main.o"])
+
+    assert_equal ["pthread"], options[:libs]
+  end
+
+  def test_parse_link_args_multiple_libs
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "-l", "pthread", "main.o"])
+
+    assert_equal ["m", "pthread"], options[:libs]
+  end
+
+  def test_parse_link_args_libdir_short_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "-L", "/usr/local/lib", "main.o"])
+
+    assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_link_args_libdir_long_flag
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "--libdir", "/opt/lib", "main.o"])
+
+    assert_equal ["/opt/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_link_args_libs_and_libdirs_defaults_to_empty
+    cli = Microbuild::CLI.new
+    _link_type, options, _objects = cli.parse_link_args(["executable", "main.o"])
+
+    assert_equal [], options[:libs]
+    assert_equal [], options[:linker_include_dirs]
+  end
+
   # ---------------------------------------------------------------------------
   # run – unknown subcommand exits
   # ---------------------------------------------------------------------------
@@ -281,9 +324,10 @@ class CLITest < Minitest::Test
       @calls = []
     end
 
-    def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [], **)
+    def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],
+               libs: [], linker_include_dirs: [], **)
       @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, definitions: }
+                  include_paths:, definitions:, libs:, linker_include_dirs: }
       true
     end
 
@@ -387,6 +431,16 @@ class CLITest < Minitest::Test
 
     assert_equal :invoke, cli.stub_driver.calls.first[:method]
     assert_includes cli.stub_driver.calls.first[:flags], :shared
+  end
+
+  def test_run_link_forwards_libs_and_linker_include_dirs
+    cli = TestCLI.new
+    cli.run(["link", "executable", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
+
+    call = cli.stub_driver.calls.first
+
+    assert_equal ["m", "pthread"], call[:libs]
+    assert_equal ["/opt/lib"],     call[:linker_include_dirs]
   end
 
 end

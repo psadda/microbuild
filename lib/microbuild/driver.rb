@@ -66,15 +66,17 @@ module Microbuild
     # +input_files+. Pass <tt>force: true</tt> to always re-invoke.
     # Relative +output_path+ values are resolved under +output_dir+.
     #
-    # @param input_files   [String, Array<String>] paths to the input files
-    # @param output_path   [String] path for the resulting output file
-    # @param flags         [Array<Symbol>] compiler/linker flags
-    # @param xflags        [Hash{Symbol => String}] extra (native) compiler flags
-    # @param include_paths [Array<String>] directories to add with -I
-    # @param definitions   [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
-    # @param force         [Boolean] when true, always invoke even if output is up-to-date
-    # @param env           [Hash] environment variables to set for the subprocess
-    # @param working_dir   [String] working directory for the subprocess (default: ".")
+    # @param input_files          [String, Array<String>] paths to the input files
+    # @param output_path          [String] path for the resulting output file
+    # @param flags                [Array<Symbol>] compiler/linker flags
+    # @param xflags               [Hash{Symbol => String}] extra (native) compiler flags
+    # @param include_paths        [Array<String>] directories to add with -I
+    # @param definitions          [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
+    # @param libs                 [Array<String>] library names to link (e.g. "m", "pthread")
+    # @param linker_include_dirs  [Array<String>] linker library search paths (-L / /LIBPATH:)
+    # @param force                [Boolean] when true, always invoke even if output is up-to-date
+    # @param env                  [Hash] environment variables to set for the subprocess
+    # @param working_dir          [String] working directory for the subprocess (default: ".")
     # @return [Boolean] true if invocation succeeded (or was skipped), false otherwise
     def invoke(
       input_files,
@@ -83,6 +85,8 @@ module Microbuild
       xflags: {},
       include_paths: [],
       definitions: [],
+      libs: [],
+      linker_include_dirs: [],
       force: false,
       env: {},
       working_dir: "."
@@ -94,7 +98,7 @@ module Microbuild
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, input_files)
 
-      cmd = @toolchain.command(input_files, out, flags, include_paths, definitions)
+      cmd = @toolchain.command(input_files, out, flags, include_paths, definitions, libs, linker_include_dirs)
       run_command(cmd, env:, working_dir:)
     end
 

@@ -39,7 +39,7 @@ module Microbuild
     # Returns the full command array for the given inputs, output, and flags.
     # The output mode (object files, shared library, static library, or
     # executable) is determined by the translated flags.
-    def command(input_files, output, flags, include_paths, definitions)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       raise NotImplementedError, "#{self.class}#command not implemented"
     end
 
@@ -61,11 +61,14 @@ module Microbuild
       @cxx  = "g++"
     end
 
-    def command(input_files, output, flags, include_paths, definitions)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       cc = (input_files.length == 1 && c_file?(input_files.first)) ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
-      [cc, *flags, *inc_flags, *def_flags, *input_files, "-o", output]
+      link_mode = !flags.include?("-c")
+      lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
+      lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
+      [cc, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
     end
 
     GNU_FLAGS = {
@@ -143,14 +146,18 @@ module Microbuild
       setup_msvc_environment(cl_command)
     end
 
-    def command(input_files, output, flags, include_paths, definitions)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map { |d| "/D#{d}" }
 
       if flags.include?("/c")
         [c, *flags, *inc_flags, *def_flags, *input_files, "/Fo#{output}"]
       else
-        [c, *flags, *inc_flags, *def_flags, *input_files, "/Fe#{output}"]
+        lib_flags      = libs.map { |l| "#{l}.lib" }
+        lib_path_flags = linker_include_dirs.map { |p| "/LIBPATH:#{p}" }
+        cmd = [c, *flags, *inc_flags, *def_flags, *input_files, *lib_flags, "/Fe#{output}"]
+        cmd += ["/link", *lib_path_flags] unless lib_path_flags.empty?
+        cmd
       end
     end
 
