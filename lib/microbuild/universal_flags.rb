@@ -12,6 +12,7 @@ module Microbuild
   #   avx          – enable AVX instructions
   #   avx2         – enable AVX2 instructions (x86-64-v3 microarchitecture level on GCC/Clang)
   #   avx512       – enable AVX-512 instructions
+  #   sse4_2       – enable SSE 4.2 instructions
   #   debug        – emit debug symbols
   #   lto          – enable link-time optimisation
   #   warn_all     – enable a broad set of warnings
@@ -34,7 +35,7 @@ module Microbuild
 
     ATTRIBUTES = %i[
       o0 o1 o2 o3
-      avx avx2 avx512
+      avx avx2 avx512 sse4_2
       debug lto
       warn_all warn_error
       c11 c17 c23
