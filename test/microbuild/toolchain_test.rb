@@ -90,6 +90,40 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
+  # vcvarsall_command: cmd.exe command string construction
+  # ---------------------------------------------------------------------------
+
+  # Helper: minimal MsvcToolchain instance with only the pure vcvarsall_command
+  # method available.  Defines its own initialize to avoid the pre-existing
+  # super arity issue in MsvcToolchain#initialize.
+  def msvc_for_vcvarsall_command
+    Class.new(Microbuild::MsvcToolchain) do
+      def initialize; end
+    end.new
+  end
+
+  def test_vcvarsall_command_plain_path
+    tc = msvc_for_vcvarsall_command
+    cmd = tc.send(:vcvarsall_command, 'C:\\VS\\VC\\Auxiliary\\Build\\vcvarsall.bat')
+
+    assert_equal '"C:\\VS\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64 && set', cmd
+  end
+
+  def test_vcvarsall_command_path_with_spaces
+    tc = msvc_for_vcvarsall_command
+    cmd = tc.send(:vcvarsall_command, 'C:\\Program Files\\VS\\VC\\Auxiliary\\Build\\vcvarsall.bat')
+
+    assert_equal '"C:\\Program Files\\VS\\VC\\Auxiliary\\Build\\vcvarsall.bat" x64 && set', cmd
+  end
+
+  def test_vcvarsall_command_path_with_embedded_double_quotes
+    tc = msvc_for_vcvarsall_command
+    cmd = tc.send(:vcvarsall_command, 'C:\\path"with"quotes\\vcvarsall.bat')
+
+    assert_equal '"C:\\path""with""quotes\\vcvarsall.bat" x64 && set', cmd
+  end
+
+  # ---------------------------------------------------------------------------
   # load_vcvarsall: environment variable parsing
   # ---------------------------------------------------------------------------
 

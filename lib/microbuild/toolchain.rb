@@ -283,10 +283,21 @@ module Microbuild
     # environment variables into the current process's ENV so that cl.exe
     # and related tools become available on PATH.
     def run_vcvarsall(vcvarsall)
-      stdout, _, status = Open3.capture3("cmd.exe", "/c", "\"#{vcvarsall}\" x64 && set")
+      stdout, _, status = Open3.capture3("cmd.exe", "/c", vcvarsall_command(vcvarsall))
       return unless status.success?
 
       load_vcvarsall(stdout)
+    end
+
+    # Builds the cmd.exe command string for calling vcvarsall.bat and capturing
+    # the resulting environment variables.  The path is double-quoted to handle
+    # spaces; any embedded double quotes are escaped by doubling them, which is
+    # the cmd.exe convention inside a double-quoted string.  Shellwords is not
+    # used here because it produces POSIX sh escaping, which is incompatible
+    # with cmd.exe syntax.
+    def vcvarsall_command(vcvarsall)
+      quoted = '"' + vcvarsall.gsub('"', '""') + '"'
+      "#{quoted} x64 && set"
     end
 
     # Parses the output of `vcvarsall.bat … && set` and merges the resulting
