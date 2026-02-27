@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 Gem::Specification.new do |spec|
   spec.name          = "microbuild"
   spec.version       = "0.1.0"
@@ -5,9 +7,9 @@ Gem::Specification.new do |spec|
   spec.email         = "psadda@gmail.com"
   spec.summary       = "A small Ruby scripting system for building C and C++ applications"
   spec.description   = <<~DESC
-                         microbuild provides a small set of classes for invoking C/C++ build tools, abstracting
-                         away differences between compilers.
-                       DESC
+    microbuild provides a small set of classes for invoking C/C++ build tools, abstracting
+    away differences between compilers.
+  DESC
   spec.license       = "BSD-3-Clause"
 
   spec.files         = Dir["lib/**/*.rb"]
@@ -16,4 +18,5 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.2"
 
   spec.add_development_dependency "minitest", "~> 5.0"
+  spec.metadata["rubygems_mfa_required"] = "true"
 end

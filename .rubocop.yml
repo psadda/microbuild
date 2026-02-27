@@ -1,0 +1,34 @@
+plugins:
+ - rubocop-minitest
+AllCops:
+  TargetRubyVersion: 3.2
+  NewCops: enable
+Style/AccessorGrouping:
+  Enabled: false
+Style/HashSyntax:
+  EnforcedStyle: no_mixed_keys
+  EnforcedShorthandSyntax: always
+Style/IfUnlessModifier:
+  Enabled: false
+Style/NumericPredicate:
+  EnforcedStyle: comparison
+Style/OneClassPerFile:
+  Enabled: false
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+Layout/EmptyLinesAroundClassBody:
+  EnforcedStyle: empty_lines
+Layout/EmptyLinesAroundModuleBody:
+  EnforcedStyle: empty_lines
+Layout/ElseAlignment:
+  Enabled: false
+Metrics/AbcSize:
+  Enabled: false
+Metrics/ClassLength:
+  Enabled: false
+Metrics/MethodLength:
+  Enabled: false
+Naming/MethodParameterName:
+  Enabled: false

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "open3"
 require_relative "toolchain"
 
@@ -59,8 +61,9 @@ module Microbuild
                 force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
+
       cmd = @toolchain.compile_command(source_file_path, out, flags, include_paths, definitions)
-      run_command(cmd, env: env, working_dir: working_dir)
+      run_command(cmd, env:, working_dir:)
     end
 
     # Links one or more object files into an executable.
@@ -77,7 +80,8 @@ module Microbuild
     def link_executable(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(@toolchain.link_executable_command(object_file_paths, out), env: env, working_dir: working_dir)
+
+      run_command(@toolchain.link_executable_command(object_file_paths, out), env:, working_dir:)
     end
 
     # Archives one or more object files into a static library.
@@ -95,11 +99,12 @@ module Microbuild
     # @return [Boolean] true if archiving succeeded (or was skipped), false otherwise
     def link_static(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       return false unless toolchain.ar
+
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
 
       @toolchain.link_static_commands(object_file_paths, out).each do |cmd|
-        return false unless run_command(cmd, env: env, working_dir: working_dir)
+        return false unless run_command(cmd, env:, working_dir:)
       end
       true
     end
@@ -118,7 +123,8 @@ module Microbuild
     def link_shared(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(@toolchain.link_shared_command(object_file_paths, out), env: env, working_dir: working_dir)
+
+      run_command(@toolchain.link_shared_command(object_file_paths, out), env:, working_dir:)
     end
 
     private
@@ -142,7 +148,7 @@ module Microbuild
     end
 
     def record_output(command, stdout, stderr)
-      entry = { command: command, stdout: stdout, stderr: stderr }
+      entry = { command:, stdout:, stderr: }
       @log << entry
       @stdout_sink.write(stdout) if @stdout_sink.respond_to?(:write)
       @stderr_sink.write(stderr) if @stderr_sink.respond_to?(:write)
@@ -159,6 +165,7 @@ module Microbuild
     # input is missing, or if any input is as new as or newer than the output.
     def up_to_date?(output_path, input_paths)
       return false unless File.exist?(output_path)
+
       output_mtime = File.mtime(output_path)
       input_paths.all? { |p| File.exist?(p) && File.mtime(p) < output_mtime }
     end

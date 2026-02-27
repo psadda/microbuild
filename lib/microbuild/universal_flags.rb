@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Microbuild
 
   # Holds toolchain-specific flag arrays for common compilation options.

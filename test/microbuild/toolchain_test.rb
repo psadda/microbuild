@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "test_helper"
 require "securerandom"
 require "tmpdir"
@@ -18,7 +20,7 @@ class MsvcToolchainTest < Minitest::Test
   def stub_msvc_class(cl_on_path: false, &block)
     klass = Class.new(Microbuild::MsvcToolchain) do
       define_method(:command_available?) do |cmd|
-        cl_on_path && (cmd == "cl" || cmd == "link" || cmd == "lib")
+        cl_on_path && %w[cl link lib].include?(cmd)
       end
 
       def run_vswhere(*)   = nil
@@ -37,6 +39,7 @@ class MsvcToolchainTest < Minitest::Test
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
+
     assert_equal "cl", tc.c
     assert_equal "cl", tc.cxx
     assert_equal "link", tc.ld
@@ -47,7 +50,8 @@ class MsvcToolchainTest < Minitest::Test
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
-    assert tc.available?
+
+    assert_predicate tc, :available?
   end
 
   # ---------------------------------------------------------------------------
@@ -56,7 +60,8 @@ class MsvcToolchainTest < Minitest::Test
 
   def test_not_available_when_vswhere_absent
     tc = stub_msvc_class(cl_on_path: false).new
-    refute tc.available?
+
+    refute_predicate tc, :available?
   end
 
   # ---------------------------------------------------------------------------
@@ -73,12 +78,14 @@ class MsvcToolchainTest < Minitest::Test
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
       tc = stub_msvc_class.new
+
       assert_equal vcvarsall_path, tc.send(:find_vcvarsall, devenv)
     end
   end
 
   def test_find_vcvarsall_returns_nil_when_bat_absent
     tc = stub_msvc_class.new
+
     assert_nil tc.send(:find_vcvarsall, "/nonexistent/Common7/IDE/devenv.exe")
   end
 
@@ -94,8 +101,9 @@ class MsvcToolchainTest < Minitest::Test
     tc = stub_msvc_class.new
     begin
       tc.send(:load_vcvarsall, output)
-      assert_equal "test_value", ENV[key_a]
-      assert_equal "another_value", ENV[key_b]
+
+      assert_equal "test_value", ENV.fetch(key_a, nil)
+      assert_equal "another_value", ENV.fetch(key_b, nil)
     ensure
       ENV.delete(key_a)
       ENV.delete(key_b)
@@ -109,7 +117,8 @@ class MsvcToolchainTest < Minitest::Test
     tc = stub_msvc_class.new
     begin
       tc.send(:load_vcvarsall, output)
-      assert_equal "valid", ENV[env_key]
+
+      assert_equal "valid", ENV.fetch(env_key, nil)
     ensure
       ENV.delete(env_key)
     end
@@ -133,10 +142,10 @@ class MsvcToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::MsvcToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && (cmd == "cl" || cmd == "link" || cmd == "lib")
+          setup_done && %w[cl link lib].include?(cmd)
         end
-        define_method(:run_vswhere) { |*args| devenv }
-        define_method(:run_vcvarsall) do |path|
+        define_method(:run_vswhere) { |*_args| devenv }
+        define_method(:run_vcvarsall) do |_path|
           setup_done = true
           load_vcvarsall("#{env_key}=from_vcvarsall\n")
         end
@@ -144,9 +153,10 @@ class MsvcToolchainTest < Minitest::Test
 
       begin
         tc = klass.new
+
         assert setup_done, "run_vcvarsall should have been called"
-        assert tc.available?
-        assert_equal "from_vcvarsall", ENV[env_key]
+        assert_predicate tc, :available?
+        assert_equal "from_vcvarsall", ENV.fetch(env_key, nil)
       ensure
         ENV.delete(env_key)
       end
@@ -164,7 +174,7 @@ class ClangClToolchainTest < Minitest::Test
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
     klass = Class.new(Microbuild::ClangClToolchain) do
       define_method(:command_available?) do |cmd|
-        clang_cl_on_path && (cmd == "clang-cl" || cmd == "link" || cmd == "lib")
+        clang_cl_on_path && %w[clang-cl link lib].include?(cmd)
       end
 
       def run_vswhere(*)   = nil
@@ -180,28 +190,33 @@ class ClangClToolchainTest < Minitest::Test
 
   def test_type_is_clang_cl
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
+
     assert_equal :clang_cl, tc.type
   end
 
   def test_compiler_commands_are_clang_cl
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
+
     assert_equal "clang-cl", tc.c
     assert_equal "clang-cl", tc.cxx
   end
 
   def test_linker_is_link
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
+
     assert_equal "link", tc.ld
   end
 
   def test_available_returns_true_when_clang_cl_is_on_path
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
-    assert tc.available?
+
+    assert_predicate tc, :available?
   end
 
   def test_not_available_when_clang_cl_absent
     tc = stub_clang_cl_class(clang_cl_on_path: false).new
-    refute tc.available?
+
+    refute_predicate tc, :available?
   end
 
   # ---------------------------------------------------------------------------
@@ -210,6 +225,7 @@ class ClangClToolchainTest < Minitest::Test
 
   def test_flags_returns_msvc_flags
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
+
     assert_equal Microbuild::MsvcToolchain::MSVC_FLAGS, tc.flags
   end
 
@@ -231,10 +247,10 @@ class ClangClToolchainTest < Minitest::Test
 
       klass = Class.new(Microbuild::ClangClToolchain) do
         define_method(:command_available?) do |cmd|
-          setup_done && (cmd == "clang-cl" || cmd == "link" || cmd == "lib")
+          setup_done && %w[clang-cl link lib].include?(cmd)
         end
-        define_method(:run_vswhere) { |*args| devenv }
-        define_method(:run_vcvarsall) do |path|
+        define_method(:run_vswhere) { |*_args| devenv }
+        define_method(:run_vcvarsall) do |_path|
           setup_done = true
           load_vcvarsall("#{env_key}=from_vcvarsall\n")
         end
@@ -242,8 +258,9 @@ class ClangClToolchainTest < Minitest::Test
 
       begin
         tc = klass.new
-        assert tc.available?
-        assert_equal "from_vcvarsall", ENV[env_key]
+
+        assert_predicate tc, :available?
+        assert_equal "from_vcvarsall", ENV.fetch(env_key, nil)
       ensure
         ENV.delete(env_key)
       end

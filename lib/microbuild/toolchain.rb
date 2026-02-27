@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "open3"
 require_relative "universal_flags"
 
@@ -26,6 +28,7 @@ module Microbuild
     # Intentionally ignores the exit status – only ENOENT (not found) matters.
     def command_available?(command)
       return false if command.nil?
+
       Open3.capture3(command, "--version")
       true
     rescue Errno::ENOENT
@@ -81,7 +84,7 @@ module Microbuild
     def compile_command(source, output, flags, include_paths, definitions)
       cc = c_file?(source) ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
-      def_flags = definitions.map  { |d| "-D#{d}" }
+      def_flags = definitions.map { |d| "-D#{d}" }
       [cc, *flags, *inc_flags, *def_flags, "-c", source, "-o", output]
     end
 
@@ -100,35 +103,35 @@ module Microbuild
     end
 
     GNU_LIKE_FLAGS = {
-        o0:            ["-O0"],
-        o1:            ["-O1"],
-        o2:            ["-O2"],
-        o3:            ["-O3"],
-        sse4_2:        ["-march=x86-64-v2"], # This is a better match for /arch:SSE4.2 than -msse4_2 is
-        avx:           ["-march=x86-64-v2", "-mavx"],
-        avx2:          ["-march=x86-64-v3"], # This is a better match for /arch:AVX2 than -mavx2 is
-        avx512:        ["-march=x86-64-v4"],
-        native:        ["-march=native", "-mtune=native"],
-        debug:         ["-g3"],
-        lto:           ["-flto"],
-        warn_all:      ["-Wall", "-Wextra", "-pedantic"],
-        warn_error:    ["-Werror"],
-        c11:           ["-std=c11"],
-        c17:           ["-std=c17"],
-        c23:           ["-std=c23"],
-        cxx11:         ["-std=c++11"],
-        cxx14:         ["-std=c++14"],
-        cxx17:         ["-std=c++17"],
-        cxx20:         ["-std=c++20"],
-        cxx23:         ["-std=c++23"],
-        cxx26:         ["-std=c++2c"],
-        asan:          ["-fsanitize=address"],
-        ubsan:         ["-fsanitize=undefined"],
-        msan:          ["-fsanitize=memory"],
-        no_rtti:       ["-fno-rtti"],
-        no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
-        pic:           ["-fPIC"],
-      }.freeze
+      o0: ["-O0"],
+      o1: ["-O1"],
+      o2: ["-O2"],
+      o3: ["-O3"],
+      sse4_2: ["-march=x86-64-v2"], # This is a better match for /arch:SSE4.2 than -msse4_2 is
+      avx: ["-march=x86-64-v2", "-mavx"],
+      avx2: ["-march=x86-64-v3"], # This is a better match for /arch:AVX2 than -mavx2 is
+      avx512: ["-march=x86-64-v4"],
+      native: ["-march=native", "-mtune=native"],
+      debug: ["-g3"],
+      lto: ["-flto"],
+      warn_all: ["-Wall", "-Wextra", "-pedantic"],
+      warn_error: ["-Werror"],
+      c11: ["-std=c11"],
+      c17: ["-std=c17"],
+      c23: ["-std=c23"],
+      cxx11: ["-std=c++11"],
+      cxx14: ["-std=c++14"],
+      cxx17: ["-std=c++17"],
+      cxx20: ["-std=c++20"],
+      cxx23: ["-std=c++23"],
+      cxx26: ["-std=c++2c"],
+      asan: ["-fsanitize=address"],
+      ubsan: ["-fsanitize=undefined"],
+      msan: ["-fsanitize=memory"],
+      no_rtti: ["-fno-rtti"],
+      no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
+      pic: ["-fPIC"]
+    }.freeze
 
     GCC_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS).freeze
 
@@ -150,8 +153,8 @@ module Microbuild
       @ranlib = "ranlib" if command_available?("ranlib")
     end
 
-    CLANG_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS.merge(lto: ["-flto=thin"])).freeze
-  
+    CLANG_FLAGS = UniversalFlags.new(**GNU_LIKE_FLAGS, lto: ["-flto=thin"]).freeze
+
     def flags
       CLANG_FLAGS
     end
@@ -173,12 +176,12 @@ module Microbuild
       @cxx  = "cl"
       @ld   = "link"
       setup_msvc_environment
-      @ar   = "lib" if command_available?("lib")
+      @ar = "lib" if command_available?("lib")
     end
 
     def compile_command(source, output, flags, include_paths, definitions)
       inc_flags = include_paths.map { |p| "/I#{p}" }
-      def_flags = definitions.map  { |d| "/D#{d}" }
+      def_flags = definitions.map { |d| "/D#{d}" }
       [c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
     end
 
@@ -195,35 +198,35 @@ module Microbuild
     end
 
     MSVC_FLAGS = UniversalFlags.new(
-        o0:            ["/Od"],
-        o1:            ["/O1"],
-        o2:            ["/O2"],
-        o3:            ["/O2", "/Ob3"],
-        sse4_2:        ["/arch:SSE4.2"],
-        avx:           ["/arch:AVX"],
-        avx2:          ["/arch:AVX2"],
-        avx512:        ["/arch:AVX512"],
-        native:        [],
-        debug:         ["/Zi"],
-        lto:           ["/GL"],
-        warn_all:      ["/W4"],
-        warn_error:    ["/WX"],
-        c11:           ["/std:c11"],
-        c17:           ["/std:c17"],
-        c23:           ["/std:clatest"],
-        cxx11:         [],
-        cxx14:         ["/std:c++14"],
-        cxx17:         ["/std:c++17"],
-        cxx20:         ["/std:c++20"],
-        cxx23:         ["/std:c++23preview"],
-        cxx26:         ["/std:c++latest"],
-        asan:          ["/fsanitize=address"],
-        ubsan:         [],
-        msan:          [],
-        no_rtti:       ["/GR-"],
-        no_exceptions: ["/EHs-", "/EHc-"],
-        pic:           [],
-      ).freeze
+      o0: ["/Od"],
+      o1: ["/O1"],
+      o2: ["/O2"],
+      o3: ["/O2", "/Ob3"],
+      sse4_2: ["/arch:SSE4.2"],
+      avx: ["/arch:AVX"],
+      avx2: ["/arch:AVX2"],
+      avx512: ["/arch:AVX512"],
+      native: [],
+      debug: ["/Zi"],
+      lto: ["/GL"],
+      warn_all: ["/W4"],
+      warn_error: ["/WX"],
+      c11: ["/std:c11"],
+      c17: ["/std:c17"],
+      c23: ["/std:clatest"],
+      cxx11: [],
+      cxx14: ["/std:c++14"],
+      cxx17: ["/std:c++17"],
+      cxx20: ["/std:c++20"],
+      cxx23: ["/std:c++23preview"],
+      cxx26: ["/std:c++latest"],
+      asan: ["/fsanitize=address"],
+      ubsan: [],
+      msan: [],
+      no_rtti: ["/GR-"],
+      no_exceptions: ["/EHs-", "/EHc-"],
+      pic: []
+    ).freeze
 
     def flags
       MSVC_FLAGS
@@ -255,10 +258,12 @@ module Microbuild
 
     # Runs vswhere.exe with the given arguments and returns the trimmed stdout,
     # or nil if vswhere.exe is absent, the command fails, or produces no output.
-    def run_vswhere(*args)
+    def run_vswhere(*)
       return nil unless File.exist?(VSWHERE_PATH)
-      stdout, _, status = Open3.capture3(VSWHERE_PATH, *args)
+
+      stdout, _, status = Open3.capture3(VSWHERE_PATH, *)
       return nil unless status.success?
+
       path = stdout.strip
       path.empty? ? nil : path
     rescue Errno::ENOENT
@@ -292,6 +297,7 @@ module Microbuild
       output.each_line do |line|
         key, sep, value = line.chomp.partition("=")
         next if sep.empty?
+
         ENV[key] = value
       end
     end
@@ -308,15 +314,13 @@ module Microbuild
       @cxx  = "clang-cl"
       @ld   = "link"
       setup_msvc_environment
-      @ar   = "lib" if command_available?("lib")
+      @ar = "lib" if command_available?("lib")
     end
 
     CLANG_CL_FLAGS = UniversalFlags.new(
-        **MSVC_FLAGS.merge(
-            o3:  ["/Ot"],         # Clang-CL treats /Ot as -O3
-            lto: ["-flto=thin"],
-          )
-      ).freeze
+      **MSVC_FLAGS, o3: ["/Ot"], # Clang-CL treats /Ot as -O3
+                    lto: ["-flto=thin"]
+    ).freeze
 
     def flags
       CLANG_CL_FLAGS

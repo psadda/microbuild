@@ -1,9 +1,12 @@
+# frozen_string_literal: true
+
 require "test_helper"
 require "tmpdir"
 require "fileutils"
 require "stringio"
 
 class BuilderTest < Minitest::Test
+
   # ---------------------------------------------------------------------------
   # #initialize / compiler detection
   # ---------------------------------------------------------------------------
@@ -14,11 +17,13 @@ class BuilderTest < Minitest::Test
 
   def test_compiler_type_is_known
     builder = Microbuild::Builder.new
-    assert_includes [:clang, :gcc, :msvc], builder.toolchain.type
+
+    assert_includes %i[clang gcc msvc], builder.toolchain.type
   end
 
   def test_compiler_is_compiler_info_struct
     builder = Microbuild::Builder.new
+
     assert_kind_of Microbuild::Toolchain, builder.toolchain
   end
 
@@ -30,6 +35,7 @@ class BuilderTest < Minitest::Test
 
   def test_compiler_info_ranlib_is_string_or_nil
     builder = Microbuild::Builder.new
+
     assert(builder.toolchain.ranlib.nil? || builder.toolchain.ranlib.is_a?(String))
   end
 
@@ -50,6 +56,7 @@ class BuilderTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_log_is_empty_before_any_command
     builder = Microbuild::Builder.new
+
     assert_empty builder.log
   end
 
@@ -61,8 +68,10 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       builder.compile(src, obj)
+
       assert_equal 1, builder.log.size
       entry = builder.log.first
+
       assert entry.key?(:command), "log entry should have :command"
       assert entry.key?(:stdout),  "log entry should have :stdout"
       assert entry.key?(:stderr),  "log entry should have :stderr"
@@ -79,6 +88,7 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj)
       builder.link_executable([obj], exe)
+
       assert_equal 2, builder.log.size
     end
   end
@@ -95,6 +105,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       builder.compile(src, obj)
+
       assert_kind_of String, sink.string
     end
   end
@@ -108,6 +119,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "this is not valid C code {\n")
 
       builder.compile(src, obj)
+
       refute_empty sink.string, "stderr sink should have received error output"
     end
   end
@@ -115,6 +127,7 @@ class BuilderTest < Minitest::Test
   def test_same_object_can_be_used_for_both_sinks
     sink = StringIO.new
     builder = Microbuild::Builder.new(stdout_sink: sink, stderr_sink: sink)
+
     assert_instance_of Microbuild::Builder, builder
   end
 
@@ -140,8 +153,9 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+
       assert result, "expected compile to return true"
-      assert File.exist?(obj), "expected object file to be created"
+      assert_path_exists obj, "expected object file to be created"
     end
   end
 
@@ -153,8 +167,9 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main() { return 0; }\n")
 
       result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+
       assert result, "expected compile to return true"
-      assert File.exist?(obj), "expected object file to be created"
+      assert_path_exists obj, "expected object file to be created"
     end
   end
 
@@ -175,8 +190,9 @@ class BuilderTest < Minitest::Test
         include_paths: [inc_dir],
         definitions: ["UNUSED=1"]
       )
+
       assert result, "expected compile to return true"
-      assert File.exist?(obj), "expected object file to be created"
+      assert_path_exists obj, "expected object file to be created"
     end
   end
 
@@ -188,6 +204,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "this is not valid C code {\n")
 
       result = builder.compile(src, obj, flags: [], include_paths: [], definitions: [])
+
       refute result, "expected compile to return false for invalid source"
     end
   end
@@ -205,8 +222,9 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj)
       result = builder.link_executable([obj], exe)
+
       assert result, "expected link_executable to return true"
-      assert File.exist?(exe), "expected executable to be created"
+      assert_path_exists exe, "expected executable to be created"
     end
   end
 
@@ -214,6 +232,7 @@ class BuilderTest < Minitest::Test
     builder = Microbuild::Builder.new
     Dir.mktmpdir do |dir|
       result = builder.link_executable([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
+
       refute result, "expected link_executable to return false for missing object file"
     end
   end
@@ -233,8 +252,9 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj)
       result = builder.link_static([obj], lib)
+
       assert result, "expected link_static to return true"
-      assert File.exist?(lib), "expected static library to be created"
+      assert_path_exists lib, "expected static library to be created"
     end
   end
 
@@ -246,12 +266,13 @@ class BuilderTest < Minitest::Test
       def toolchain_classes
         [Class.new(Microbuild::GnuToolchain) do
           def command_available?(cmd)
-            cmd == "ar" ? false : true
+            cmd != "ar"
           end
         end]
       end
     end
     builder = klass.new
+
     refute builder.link_static([], "/tmp/fake.a"), "expected false when ar is unavailable"
   end
 
@@ -270,8 +291,9 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj, flags: ["-fPIC"])
       result = builder.link_shared([obj], lib)
+
       assert result, "expected link_shared to return true"
-      assert File.exist?(lib), "expected shared library to be created"
+      assert_path_exists lib, "expected shared library to be created"
     end
   end
 
@@ -286,6 +308,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       builder.compile(src, obj)
+
       assert_equal 1, builder.log.size
 
       # Make src appear older than obj so the output is considered up-to-date.
@@ -293,6 +316,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, src)
 
       result = builder.compile(src, obj)
+
       assert result, "expected skipped compile to return true"
       assert_equal 1, builder.log.size, "log should not grow when step is skipped"
     end
@@ -311,6 +335,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, src)
 
       result = builder.compile(src, obj, force: true)
+
       assert result, "expected forced compile to return true"
       assert_equal 2, builder.log.size, "log should grow when force: true"
     end
@@ -326,6 +351,7 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj)
       builder.link_executable([obj], exe)
+
       assert_equal 2, builder.log.size
 
       # Make obj appear older than exe.
@@ -333,6 +359,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, obj)
 
       result = builder.link_executable([obj], exe)
+
       assert result, "expected skipped link_executable to return true"
       assert_equal 2, builder.log.size, "log should not grow when step is skipped"
     end
@@ -353,6 +380,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, obj)
 
       result = builder.link_executable([obj], exe, force: true)
+
       assert result, "expected forced link_executable to return true"
       assert_equal 3, builder.log.size, "log should grow when force: true"
     end
@@ -376,6 +404,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, obj)
 
       result = builder.link_static([obj], lib)
+
       assert result, "expected skipped link_static to return true"
       assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
     end
@@ -399,6 +428,7 @@ class BuilderTest < Minitest::Test
       File.utime(past, past, obj)
 
       result = builder.link_shared([obj], lib)
+
       assert result, "expected skipped link_shared to return true"
       assert_equal log_size, builder.log.size, "log should not grow when step is skipped"
     end
@@ -416,26 +446,29 @@ class BuilderTest < Minitest::Test
 
       builder = Microbuild::Builder.new(output_dir: build_dir)
       result = builder.compile(src, "hello.o")
+
       assert result, "expected compile to succeed"
-      assert File.exist?(File.join(build_dir, "hello.o")), "object should be in output_dir"
+      assert_path_exists File.join(build_dir, "hello.o"), "object should be in output_dir"
     end
   end
 
   def test_absolute_output_path_ignores_output_dir
     Dir.mktmpdir do |dir|
       src = File.join(dir, "hello.c")
-      obj = File.join(dir, "hello.o")  # absolute
+      obj = File.join(dir, "hello.o") # absolute
       File.write(src, "int main(void) { return 0; }\n")
 
       builder = Microbuild::Builder.new(output_dir: "/nonexistent_build_dir")
       result = builder.compile(src, obj)
+
       assert result, "expected compile to succeed with absolute output path"
-      assert File.exist?(obj), "object should be at the absolute path"
+      assert_path_exists obj, "object should be at the absolute path"
     end
   end
 
   def test_output_dir_default_is_build
     builder = Microbuild::Builder.new
+
     assert_equal "build", builder.output_dir
   end
 
@@ -450,6 +483,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       result = builder.compile(src, obj, env: {}, working_dir: dir)
+
       assert result, "expected compile to succeed with env: and working_dir:"
     end
   end
@@ -464,6 +498,7 @@ class BuilderTest < Minitest::Test
 
       builder.compile(src, obj)
       result = builder.link_executable([obj], exe, env: {}, working_dir: dir)
+
       assert result, "expected link_executable to succeed with env: and working_dir:"
     end
   end
@@ -477,6 +512,7 @@ class BuilderTest < Minitest::Test
       File.write(src, "int main(void) { return 0; }\n")
 
       result = builder.compile(src, obj, env: { "MY_BUILD_FLAG" => "1" })
+
       assert result, "expected compile to succeed when env: contains custom vars"
     end
   end
@@ -490,8 +526,10 @@ class BuilderTest < Minitest::Test
 
       # Run with working_dir set to the tmp dir; absolute paths still resolve.
       result = builder.compile(src, obj, working_dir: dir)
+
       assert result, "expected compile to succeed with working_dir set"
-      assert File.exist?(obj), "object file should exist after compile with working_dir"
+      assert_path_exists obj, "object file should exist after compile with working_dir"
     end
   end
+
 end
