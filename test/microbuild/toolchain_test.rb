@@ -85,17 +85,18 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_load_vcvarsall_merges_env_variables
-    env_key = "MICROBUILD_TEST_#{SecureRandom.hex(8)}"
-    output = "#{env_key}=test_value\nANOTHER_KEY=another_value\n"
+    key_a = "MICROBUILD_TEST_A_#{SecureRandom.hex(8)}"
+    key_b = "MICROBUILD_TEST_B_#{SecureRandom.hex(8)}"
+    output = "#{key_a}=test_value\n#{key_b}=another_value\n"
 
     tc = stub_msvc_class.new
     begin
       tc.send(:load_vcvarsall, output)
-      assert_equal "test_value", ENV[env_key]
-      assert_equal "another_value", ENV["ANOTHER_KEY"]
+      assert_equal "test_value", ENV[key_a]
+      assert_equal "another_value", ENV[key_b]
     ensure
-      ENV.delete(env_key)
-      ENV.delete("ANOTHER_KEY")
+      ENV.delete(key_a)
+      ENV.delete(key_b)
     end
   end
 
