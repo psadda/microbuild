@@ -2,6 +2,8 @@ require "test_helper"
 require "securerandom"
 require "tmpdir"
 require "fileutils"
+require "microbuild/toolchain"
+
 
 class MsvcToolchainTest < Minitest::Test
 

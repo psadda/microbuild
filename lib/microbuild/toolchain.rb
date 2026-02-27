@@ -1,4 +1,5 @@
 require "open3"
+require_relative "universal_flags"
 
 module Microbuild
 
@@ -29,6 +30,11 @@ module Microbuild
       true
     rescue Errno::ENOENT
       false
+    end
+
+    # Returns a UniversalFlags instance with flag arrays for this toolchain.
+    def flags
+      raise NotImplementedError, "#{self.class}#flags not implemented"
     end
 
     # Returns the full compile command for the given inputs.
@@ -93,6 +99,43 @@ module Microbuild
       cmds
     end
 
+    def flags
+      UniversalFlags.new(**gnu_like_flags)
+    end
+
+    private
+
+    def gnu_like_flags
+      {
+        o0:            ["-O0"],
+        o1:            ["-O1"],
+        o2:            ["-O2"],
+        o3:            ["-O3"],
+        avx:           ["-mavx"],
+        avx2:          ["-march=x86-64-v3"],
+        avx512:        ["-mavx512f"],
+        sse4_2:        ["-msse4.2"],
+        debug:         ["-g"],
+        lto:           ["-flto"],
+        warn_all:      ["-Wall", "-Wextra", "-pedantic"],
+        warn_error:    ["-Werror"],
+        c11:           ["-std=c11"],
+        c17:           ["-std=c17"],
+        c23:           ["-std=c23"],
+        cxx11:         ["-std=c++11"],
+        cxx14:         ["-std=c++14"],
+        cxx17:         ["-std=c++17"],
+        cxx20:         ["-std=c++20"],
+        cxx23:         ["-std=c++23"],
+        asan:          ["-fsanitize=address"],
+        ubsan:         ["-fsanitize=undefined"],
+        msan:          ["-fsanitize=memory"],
+        no_rtti:       ["-fno-rtti"],
+        no_exceptions: ["-fno-exceptions", "-fno-unwind-tables"],
+        pic:           ["-fPIC"],
+      }
+    end
+
   end
 
   # Clang toolchain – identical command structure to GNU.
@@ -105,6 +148,10 @@ module Microbuild
       @ld     = "clang++"
       @ar     = "ar"     if command_available?("ar")
       @ranlib = "ranlib" if command_available?("ranlib")
+    end
+
+    def flags
+      UniversalFlags.new(**gnu_like_flags.merge(lto: ["-flto=thin"]))
     end
 
   end
@@ -143,6 +190,37 @@ module Microbuild
 
     def link_static_commands(object_files, output)
       [[ar, "/OUT:#{output}", *object_files]]
+    end
+
+    def flags
+      UniversalFlags.new(
+        o0:            ["/Od"],
+        o1:            ["/O1"],
+        o2:            ["/O2"],
+        o3:            ["/O2", "/Ob3"],
+        avx:           ["/arch:AVX"],
+        avx2:          ["/arch:AVX2"],
+        avx512:        ["/arch:AVX512"],
+        sse4_2:        ["/arch:SSE4.2"],
+        debug:         ["/Zi"],
+        lto:           ["/GL"],
+        warn_all:      ["/W4"],
+        warn_error:    ["/WX"],
+        c11:           ["/std:c11"],
+        c17:           ["/std:c17"],
+        c23:           ["/std:clatest"],
+        cxx11:         [],
+        cxx14:         ["/std:c++14"],
+        cxx17:         ["/std:c++17"],
+        cxx20:         ["/std:c++20"],
+        cxx23:         ["/std:c++latest"],
+        asan:          ["/fsanitize=address"],
+        ubsan:         [],
+        msan:          [],
+        no_rtti:       ["/GR-"],
+        no_exceptions: ["/EHs-", "/EHc-"],
+        pic:           [],
+      )
     end
 
     private
