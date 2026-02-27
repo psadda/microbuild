@@ -1,31 +1,19 @@
 require "open3"
+require_relative "toolchain"
 
 module Microbuild
 
   # Raised when no supported C/C++ compiler can be found on the system.
   class CompilerNotFoundError < StandardError; end
 
-  # Holds information about a detected compiler toolchain.
-  #   type   – symbolic name (:clang, :gcc, :msvc)
-  #   c      – command used to compile C source files
-  #   cxx    – command used to compile C++ source files
-  #   ld     – command used to link executables and shared libraries
-  #   ar     – command used to create static libraries (nil if not found)
-  #   ranlib – command used to index static libraries (nil if not found)
-  ToolchainInfo = Struct.new(:type, :c, :cxx, :ld, :ar, :ranlib)
-
   # Builder wraps C and C++ compile and link operations using the first
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Builder
 
-    # Ordered list of compiler candidates to probe.
-    TOOLCHAIN_CANDIDATES = [
-      { type: :clang, c: "clang", cxx: "clang++", ld: "clang++", ar: "ar",  ranlib: "ranlib" },
-      { type: :gcc,   c: "gcc",   cxx: "g++",     ld: "g++",     ar: "ar",  ranlib: "ranlib" },
-      { type: :msvc,  c: "cl",    cxx: "cl",       ld: "link",    ar: "lib", ranlib: nil      },
-    ].freeze
+    # Ordered list of toolchain classes to probe, in priority order.
+    TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
 
-    # The detected toolchain (a ToolchainInfo struct).
+    # The detected toolchain (a Toolchain subclass instance).
     attr_reader :toolchain
 
     # Accumulated log entries from all compile/link invocations.
@@ -50,7 +38,7 @@ module Microbuild
       @stderr_sink = stderr_sink
       @output_dir = output_dir
       @log = []
-      @toolchain = detect_compiler!
+      @toolchain = detect_toolchain!
     end
 
     # Compiles a single source file into an object file.
@@ -71,7 +59,7 @@ module Microbuild
                 force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
-      cmd = build_compile_command(source_file_path, out, flags, include_paths, definitions)
+      cmd = @toolchain.compile_command(source_file_path, out, flags, include_paths, definitions)
       run_command(cmd, env: env, working_dir: working_dir)
     end
 
@@ -89,7 +77,7 @@ module Microbuild
     def link_executable(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(build_link_executable_command(object_file_paths, out), env: env, working_dir: working_dir)
+      run_command(@toolchain.link_executable_command(object_file_paths, out), env: env, working_dir: working_dir)
     end
 
     # Archives one or more object files into a static library.
@@ -110,13 +98,10 @@ module Microbuild
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
 
-      if toolchain.type == :msvc
-        run_command([toolchain.ar, "/OUT:#{out}", *object_file_paths], env: env, working_dir: working_dir)
-      else
-        return false unless run_command([toolchain.ar, "rcs", out, *object_file_paths], env: env, working_dir: working_dir)
-        return run_command([toolchain.ranlib, out], env: env, working_dir: working_dir) if toolchain.ranlib
-        true
+      @toolchain.link_static_commands(object_file_paths, out).each do |cmd|
+        return false unless run_command(cmd, env: env, working_dir: working_dir)
       end
+      true
     end
 
     # Links one or more object files into a shared library.
@@ -133,67 +118,21 @@ module Microbuild
     def link_shared(object_file_paths, output_path, force: false, env: {}, working_dir: ".")
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, object_file_paths)
-      run_command(build_link_shared_command(object_file_paths, out), env: env, working_dir: working_dir)
+      run_command(@toolchain.link_shared_command(object_file_paths, out), env: env, working_dir: working_dir)
     end
 
     private
 
-    def detect_compiler!
-      TOOLCHAIN_CANDIDATES.each do |candidate|
-        next unless command_available?(candidate[:c])
-        ar     = candidate[:ar]     if command_available?(candidate[:ar])
-        ranlib = candidate[:ranlib] if command_available?(candidate[:ranlib])
-        return ToolchainInfo.new(candidate[:type], candidate[:c], candidate[:cxx],
-                                candidate[:ld], ar, ranlib)
+    def detect_toolchain!
+      toolchain_classes.each do |klass|
+        tc = klass.new
+        return tc if tc.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
     end
 
-    # Returns true if +command+ is present in PATH, false otherwise.
-    # Intentionally ignores the exit status – only ENOENT (not found) matters.
-    def command_available?(command)
-      return false if command.nil?
-      Open3.capture3(command, "--version")
-      true
-    rescue Errno::ENOENT
-      false
-    end
-
-    def c_file?(path)
-      File.extname(path).downcase == ".c"
-    end
-
-    def build_compile_command(source, output, flags, include_paths, definitions)
-      if toolchain.type == :msvc
-        build_msvc_compile_command(source, output, flags, include_paths, definitions)
-      else
-        cc = c_file?(source) ? toolchain.c : toolchain.cxx
-        inc_flags = include_paths.map { |p| "-I#{p}" }
-        def_flags = definitions.map  { |d| "-D#{d}" }
-        [cc, *flags, *inc_flags, *def_flags, "-c", source, "-o", output]
-      end
-    end
-
-    def build_msvc_compile_command(source, output, flags, include_paths, definitions)
-      inc_flags = include_paths.map { |p| "/I#{p}" }
-      def_flags = definitions.map  { |d| "/D#{d}" }
-      [toolchain.c, *flags, *inc_flags, *def_flags, "/c", source, "/Fo#{output}"]
-    end
-
-    def build_link_executable_command(object_files, output)
-      if toolchain.type == :msvc
-        [toolchain.ld, *object_files, "/OUT:#{output}"]
-      else
-        [toolchain.ld, *object_files, "-o", output]
-      end
-    end
-
-    def build_link_shared_command(object_files, output)
-      if toolchain.type == :msvc
-        [toolchain.ld, "/DLL", *object_files, "/OUT:#{output}"]
-      else
-        [toolchain.ld, "-shared", *object_files, "-o", output]
-      end
+    def toolchain_classes
+      TOOLCHAIN_CLASSES
     end
 
     def run_command(cmd, env: {}, working_dir: ".")
