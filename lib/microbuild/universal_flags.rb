@@ -13,6 +13,7 @@ module Microbuild
   #   avx           – enable x86-64-v2 microarchitecture level plus AVX instructions
   #   avx2          – enable x86-64-v3 microarchitecture level
   #   avx512        – enable x86-64-v4 microarchitecture level
+  #   native        – optimize for the capabilities of the host CPU
   #   debug         – emit debug symbols
   #   lto           – enable link-time optimisation
   #   warn_all      – enable a broad set of warnings
@@ -36,7 +37,7 @@ module Microbuild
 
     ATTRIBUTES = %i[
       o0 o1 o2 o3
-      sse4_2 avx avx2 avx512
+      sse4_2 avx avx2 avx512 native
       debug lto
       warn_all warn_error
       c11 c17 c23
