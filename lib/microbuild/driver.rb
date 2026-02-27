@@ -83,7 +83,7 @@ module Microbuild
       working_dir: "."
     )
       flags = translate_flags(flags)
-      flags.concat!(xflags[@toolchain.type] || [])
+      flags.concat(xflags[@toolchain.type] || [])
 
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, [source_file_path])
