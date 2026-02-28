@@ -175,13 +175,12 @@ module MetaCC
     OUTPUT_TYPE_FLAGS = %i[objects shared static].freeze
 
     def compile_sources(driver, sources, options)
-      type_flags = options[:flags] & OUTPUT_TYPE_FLAGS
-      type_flags = [:objects] if type_flags.empty?
       sources.each do |source|
         output = options[:output] || default_object_path(source)
         success = driver.invoke(
-          source, output,
-          flags:         (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
+          source,
+          options[:output],
+          flags:         options[:flags],
           xflags:        options[:xflags],
           include_paths: options[:includes],
           defs:          options[:defines],
