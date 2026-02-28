@@ -340,6 +340,14 @@ class GnuToolchainCommandTest < Minitest::Test
     refute_includes cmd, "-L/opt/lib"
   end
 
+  # ---------------------------------------------------------------------------
+  # strip flag
+  # ---------------------------------------------------------------------------
+
+  def test_strip_flag_maps_to_wl_strip_unneeded
+    assert_equal ["-Wl,--strip-unneeded"], MetaCC::GnuToolchain::GNU_FLAGS[:strip]
+  end
+
 end
 
 class MsvcToolchainCommandTest < Minitest::Test
@@ -395,6 +403,14 @@ class MsvcToolchainCommandTest < Minitest::Test
     cmd = msvc.command(["main.obj"], "main.exe", [], [], [], [], [])
 
     refute_includes cmd, "/link"
+  end
+
+  # ---------------------------------------------------------------------------
+  # strip flag
+  # ---------------------------------------------------------------------------
+
+  def test_strip_flag_maps_to_empty_array
+    assert_equal [], MetaCC::MsvcToolchain::MSVC_FLAGS[:strip]
   end
 
 end

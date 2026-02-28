@@ -102,7 +102,8 @@ module MetaCC
       pic:           ["-fPIC"],
       objects:       ["-c"],
       shared:        ["-shared"],
-      static:        ["-r", "-nostdlib"]
+      static:        ["-r", "-nostdlib"],
+      strip:         ["-Wl,--strip-unneeded"]
     }.freeze
 
     def flags
@@ -192,7 +193,8 @@ module MetaCC
       pic:           [],
       objects:       ["/c"],
       shared:        ["/LD"],
-      static:        ["/c"]
+      static:        ["/c"],
+      strip:         []
     }.freeze
 
     def flags
