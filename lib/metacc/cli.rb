@@ -10,27 +10,29 @@ module MetaCC
   # Subcommands:
   #   c   <sources...> -o <output> [options]       – compile C source file(s)
   #   cxx <sources...> -o <output> [options]       – compile C++ source file(s)
-  #   link <objects...> -o <output> [options]      – link object files (default: executable)
   #
-  # Output type flags for c/cxx (default produces object files):
-  #   --shared           – produce a shared library
-  #   --static           – produce a static library
-  #   --objects / -c     – produce object files (explicit; same as default)
-  #
-  # Output type flags for link (default produces an executable):
-  #   --shared           – produce a shared library
-  #   --static           – produce a static library
-  #   --strip / -s       – strip unneeded symbols
-  #
-  # Recognised flags (passed to Driver#compile via flags:):
-  #   -O0 -O1 -O2 -O3
-  #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native
-  #   --debug / -g --lto
+  # General:
   #   -Wall -Werror
   #   --std=c11 --std=c17 --std=c23                                             (c only)
   #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26  (cxx only)
+  #
+  # Linking:
+  #   --objects / -c     – compile only; don't link
+  #   -l, -L             - specify linker input
+  #   --shared           – produce a shared library
+  #   --static           – produce a static library
+  #   --lto              - enable link time optimization
+  #   --strip / -s       – strip unneeded symbols
+  #
+  # Code generation:
+  #   -O0, -O1, -O2, -O3                             - Set the optimization level
+  #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native   - Compile for the given target
+  #   --no-rtti --no-exceptions
+  #   --pic
+  #
+  # Debugging:
+  #   --debug / -g
   #   --asan --ubsan --msan
-  #   --no-rtti --no-exceptions --pic
   #
   # Toolchain-specific flags (passed to Driver#compile via xflags:):
   #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
