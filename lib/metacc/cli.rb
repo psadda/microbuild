@@ -96,6 +96,9 @@ module MetaCC
       subcommand = argv.shift
 
       case subcommand
+      when "--version"
+        driver = build_driver
+        $stdout.write(driver.toolchain.show_version)
       when "c", "cxx"
         options, sources = parse_compile_args(argv, subcommand)
         driver = build_driver
