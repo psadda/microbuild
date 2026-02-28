@@ -11,22 +11,15 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_include_short
     cli = MetaCC::CLI.new
-    options, sources = cli.parse_compile_args(["-i", "/usr/include", "main.c"])
+    options, sources = cli.parse_compile_args(["-I", "/usr/include", "main.c"])
 
     assert_equal ["/usr/include"], options[:includes]
     assert_equal ["main.c"], sources
   end
 
-  def test_parse_compile_args_include_long
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--include", "/opt/include", "main.c"])
-
-    assert_equal ["/opt/include"], options[:includes]
-  end
-
   def test_parse_compile_args_multiple_includes
     cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-i", "/a", "-i", "/b", "main.c"])
+    options, _sources = cli.parse_compile_args(["-I", "/a", "-I", "/b", "main.c"])
 
     assert_equal ["/a", "/b"], options[:includes]
   end
@@ -36,21 +29,14 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_parse_compile_args_define_short
     cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-d", "FOO=1", "main.c"])
+    options, _sources = cli.parse_compile_args(["-D", "FOO=1", "main.c"])
 
     assert_equal ["FOO=1"], options[:defines]
   end
 
-  def test_parse_compile_args_define_long
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--define", "BAR", "main.c"])
-
-    assert_equal ["BAR"], options[:defines]
-  end
-
   def test_parse_compile_args_multiple_defines
     cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-d", "FOO", "-d", "BAR=2", "main.c"])
+    options, _sources = cli.parse_compile_args(["-D", "FOO", "-D", "BAR=2", "main.c"])
 
     assert_equal ["FOO", "BAR=2"], options[:defines]
   end
@@ -198,7 +184,7 @@ class CLITest < Minitest::Test
 
   def test_parse_compile_args_options_and_sources_mixed
     cli = MetaCC::CLI.new
-    options, sources = cli.parse_compile_args(["-O2", "-i", "/inc", "foo.c", "bar.c"])
+    options, sources = cli.parse_compile_args(["-O2", "-I", "/inc", "foo.c", "bar.c"])
 
     assert_includes options[:flags], :o2
     assert_equal ["/inc"], options[:includes]
@@ -255,25 +241,11 @@ class CLITest < Minitest::Test
     assert_equal ["m"], options[:libs]
   end
 
-  def test_parse_compile_args_lib_long_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--lib", "pthread", "main.c"])
-
-    assert_equal ["pthread"], options[:libs]
-  end
-
   def test_parse_compile_args_libdir_short_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-L", "/usr/local/lib", "main.c"])
 
     assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
-  end
-
-  def test_parse_compile_args_libdir_long_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--libdir", "/opt/lib", "main.c"])
-
-    assert_equal ["/opt/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_compile_args_libs_and_libdirs_default_to_empty
@@ -329,13 +301,6 @@ class CLITest < Minitest::Test
     assert_equal ["m"], options[:libs]
   end
 
-  def test_parse_link_args_lib_long_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--lib", "pthread", "main.o"])
-
-    assert_equal ["pthread"], options[:libs]
-  end
-
   def test_parse_link_args_multiple_libs
     cli = MetaCC::CLI.new
     options, _objects = cli.parse_link_args(["-l", "m", "-l", "pthread", "main.o"])
@@ -348,13 +313,6 @@ class CLITest < Minitest::Test
     options, _objects = cli.parse_link_args(["-L", "/usr/local/lib", "main.o"])
 
     assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
-  end
-
-  def test_parse_link_args_libdir_long_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--libdir", "/opt/lib", "main.o"])
-
-    assert_equal ["/opt/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_link_args_libs_and_libdirs_defaults_to_empty
@@ -491,7 +449,7 @@ class CLITest < Minitest::Test
 
   def test_run_compile_forwards_includes_and_defines
     cli = TestCLI.new
-    cli.run(["c", "-i", "/inc", "-d", "FOO=1", "-o", "main.o", "main.c"])
+    cli.run(["c", "-I", "/inc", "-D", "FOO=1", "-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
 

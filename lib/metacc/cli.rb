@@ -24,7 +24,7 @@ module MetaCC
   # Recognised flags (passed to Driver#compile via flags:):
   #   -O0 -O1 -O2 -O3
   #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native
-  #   --debug --lto
+  #   --debug / -g --lto
   #   -Wall -Werror
   #   --std=c11 --std=c17 --std=c23
   #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26
@@ -140,23 +140,19 @@ module MetaCC
       parser.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
       parser.on("--shared", "Produce a shared library") { options[:flags] << :shared }
       parser.on("--static", "Produce a static library") { options[:flags] << :static }
-      parser.on("-l LIB", "--lib LIB", "Link against library LIB") { |v| options[:libs] << v }
-      parser.on("-L DIR", "--libdir DIR", "Add linker library search path") do |v|
-        options[:linker_include_dirs] << v
-      end
+      parser.on("-l LIB", "Link against library LIB") { |v| options[:libs] << v }
+      parser.on("-L DIR", "Add linker library search path") { |v| options[:linker_include_dirs] << v }
     end
 
     # Registers compile-only options (include paths, defines, code-gen flags, etc.).
     def setup_compile_options(parser, options)
-      parser.on("-I", "--include DIRPATH", "Add an include search directory") do |v|
-        options[:includes] << v
-      end
-      parser.on("-D", "--define DEF", "Add a preprocessor definition") { |v| options[:defines] << v }
+      parser.on("-I DIRPATH", "Add an include search directory") { |v| options[:includes] << v }
+      parser.on("-D DEF", "Add a preprocessor definition") { |v| options[:defines] << v }
       parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") { |l| options[:flags] << :"o#{l}" }
       parser.on("-m", "--arch ARCH", "Target architecture") { |v| options[:flags] << TARGETS[v] }
-      parser.on("-d", "--debug", "Emit debugging symbols") { options[:flags] << :debug }
+      parser.on("-g", "--debug", "Emit debugging symbols") { options[:flags] << :debug }
       parser.on("--std STANDARD", "Specify the language standard") { |v| options[:flags] << STANDARDS[v] }
-      parser.on("-W", "--warn OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
+      parser.on("-W OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
       parser.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
       LONG_FLAGS.each { |name, sym| parser.on("--#{name}") { options[:flags] << sym } }
       XFLAGS.each do |name, tc_sym|
