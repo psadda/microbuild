@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "open3"
 require_relative "toolchain"
 
 module MetaCC
@@ -98,8 +97,7 @@ module MetaCC
     end
 
     def run_command(cmd, env: {}, working_dir: ".")
-      _out, _err, status = Open3.capture3(env, *cmd, chdir: working_dir)
-      status.success?
+      !!system(env, *cmd, chdir: working_dir, out: File::NULL, err: File::NULL)
     end
 
   end
