@@ -42,24 +42,24 @@ module MetaCC
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
     LONG_FLAGS = {
-      "lto" => :lto,
-      "asan" => :asan,
-      "ubsan" => :ubsan,
-      "msan" => :msan,
-      "no-rtti" => :no_rtti,
+      "lto" =>           :lto,
+      "asan" =>          :asan,
+      "ubsan" =>         :ubsan,
+      "msan" =>          :msan,
+      "no-rtti" =>       :no_rtti,
       "no-exceptions" => :no_exceptions,
-      "pic" => :pic
+      "pic" =>           :pic
     }.freeze
 
     WARNING_CONFIGS = {
-      "all" => :warn_all,
+      "all" =>   :warn_all,
       "error" => :warn_error
     }
 
     TARGETS = {
       "sse4.2" => :sse4_2,
-      "avx" => :avx,
-      "avx2" => :avx2,
+      "avx" =>    :avx,
+      "avx2" =>   :avx2,
       "avx512" => :avx512,
       "native" => :native
     }.freeze
@@ -81,9 +81,9 @@ module MetaCC
 
     # Maps --x<name> CLI option names to xflags toolchain-class keys.
     XFLAGS = {
-      "xmsvc" => MsvcToolchain,
-      "xgnu" => GnuToolchain,
-      "xclang" => ClangToolchain,
+      "xmsvc" =>    MsvcToolchain,
+      "xgnu" =>     GnuToolchain,
+      "xclang" =>   ClangToolchain,
       "xclangcl" => ClangClToolchain
     }.freeze
 
@@ -117,7 +117,6 @@ module MetaCC
                   libs: [], linker_paths: [] }
       standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
-      setup_link_options(parser, options)
       setup_compile_options(parser, options, standards)
       sources = parser.permute(argv)
       [options, sources]
@@ -129,7 +128,7 @@ module MetaCC
     def parse_link_args(argv)
       options = { output: nil, libs: [], linker_paths: [], flags: [] }
       parser = OptionParser.new
-      setup_link_options(parser, options)
+      setup_compile_options(parser, options)
       objects = parser.permute(argv)
       [options, objects]
     end
@@ -140,31 +139,58 @@ module MetaCC
       Driver.new
     end
 
-    # Registers options common to all subcommands (output path, link type, libs).
-    def setup_link_options(parser, options)
-      parser.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
-      parser.on("--shared", "Produce a shared library") { options[:flags] << :shared }
-      parser.on("--static", "Produce a static library") { options[:flags] << :static }
-      parser.on("-s", "--strip", "Strip unneeded symbols") { options[:flags] << :strip }
-      parser.on("-l LIB", "Link against library LIB") { |v| options[:libs] << v }
-      parser.on("-L DIR", "Add linker library search path") { |v| options[:linker_paths] << v }
-    end
-
-    # Registers compile-only options (include paths, defines, code-gen flags, etc.).
     def setup_compile_options(parser, options, standards)
-      parser.on("-I DIRPATH", "Add an include search directory") { |v| options[:includes] << v }
-      parser.on("-D DEF", "Add a preprocessor definition") { |v| options[:defines] << v }
-      parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") { |l| options[:flags] << :"o#{l}" }
-      parser.on("-m", "--arch ARCH", "Target architecture") { |v| options[:flags] << TARGETS[v] }
-      parser.on("-g", "--debug", "Emit debugging symbols") { options[:flags] << :debug }
-      parser.on("--std STANDARD", "Specify the language standard") { |v| options[:flags] << standards[v] }
-      parser.on("-W OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
-      parser.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
-      LONG_FLAGS.each { |name, sym| parser.on("--#{name}") { options[:flags] << sym } }
+      parser.on("-o FILEPATH", "Output file path") do |value|
+        options[:output] = v
+      end
+      parser.on("-I DIRPATH", "Add an include search directory") do |value|
+        options[:includes] << value
+      end
+      parser.on("-D DEF", "Add a preprocessor definition") do |value|
+        options[:defines] << value
+      end
+      parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
+        options[:flags] << :"o#{l}"
+      end
+      parser.on("-m", "--arch ARCH", "Target architecture") do |value|
+        options[:flags] << TARGETS[v]
+      end
+      parser.on("-g", "--debug", "Emit debugging symbols") do
+        options[:flags] << :debug
+      end
+      parser.on("--std STANDARD", "Specify the language standard") do |value|
+        options[:flags] << standards[v]
+      end
+      parser.on("-W OPTION", "Configure warnings") do |value|
+        options[:flags] << WARNING_CONFIGS[v]
+      end
+      parser.on("-c", "--objects", "Produce object files") do
+        options[:flags] << :objects
+      end
+      parser.on("-l LIB", "Link against library LIB") do |value|
+        options[:libs] << value
+      end
+      parser.on("-L DIR", "Add linker library search path") do |value|
+        options[:linker_paths] << value
+      end
+      parser.on("--shared", "Produce a shared library") do
+        options[:flags] << :shared
+      end
+      parser.on("--static", "Produce a static library") do
+        options[:flags] << :static
+      end
+      parser.on("-s", "--strip", "Strip unneeded symbols") do
+        options[:flags] << :strip
+      end
+      LONG_FLAGS.each do |name, sym|
+        parser.on("--#{name}") do
+          options[:flags] << sym
+        end
+      end
       XFLAGS.each do |name, tc_class|
-        parser.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_class} toolchain") do |v|
+        parser.on("--#{name} VALUE", "Pass VALUE to the #{tc_class} toolchain") do |value|
           options[:xflags][tc_class] ||= []
-          options[:xflags][tc_class] << v
+          options[:xflags][tc_class] << value
         end
       end
     end
