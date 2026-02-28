@@ -100,10 +100,6 @@ module MetaCC
         options, sources = parse_compile_args(argv, subcommand)
         driver = build_driver
         compile_sources(driver, sources, options)
-      when "link"
-        options, objects = parse_link_args(argv)
-        driver = build_driver
-        link_objects(driver, objects, options[:output], options[:flags], options[:libs], options[:linker_paths])
       else
         warn "Usage: metacc <c|cxx|link> [options] <files...>"
         exit 1
@@ -120,17 +116,6 @@ module MetaCC
       setup_compile_options(parser, options, standards)
       sources = parser.permute(argv)
       [options, sources]
-    end
-
-    # Parses link subcommand arguments.
-    # Returns [options_hash, remaining_positional_args].
-    # Output type defaults to executable; use --shared or --static to override.
-    def parse_link_args(argv)
-      options = { output: nil, libs: [], linker_paths: [], flags: [] }
-      parser = OptionParser.new
-      setup_compile_options(parser, options)
-      objects = parser.permute(argv)
-      [options, objects]
     end
 
     private
@@ -212,11 +197,6 @@ module MetaCC
         )
         exit 1 unless success
       end
-    end
-
-    def link_objects(driver, objects, output, flags = [], libs = [], linker_paths = [])
-      success = driver.invoke(objects, output, flags:, libs:, linker_paths:)
-      exit 1 unless success
     end
 
     def default_object_path(source)
