@@ -29,9 +29,8 @@ module MetaCC
       !system(command, "--version", out: File::NULL, err: File::NULL).nil?
     end
 
-    # Returns the compiler version string by running the compiler with --version.
-    # Returns stdout if non-empty, otherwise stderr.
-    def show_version
+    # Returns the output of running the compiler with --version.
+    def version_banner
       IO.popen([c, "--version", { err: :out }], &:read)
     end
 
