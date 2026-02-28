@@ -208,86 +208,93 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   # parse_link_args
   # ---------------------------------------------------------------------------
-  def test_parse_link_args_executable_type
+  def test_parse_link_args_default_produces_no_type_flags
     cli = MetaCC::CLI.new
-    link_type, _options, _objects = cli.parse_link_args(["executable", "main.o"])
+    options, _objects = cli.parse_link_args(["main.o"])
 
-    assert_equal "executable", link_type
+    assert_empty options[:flags]
   end
 
-  def test_parse_link_args_static_type
+  def test_parse_link_args_static_flag
     cli = MetaCC::CLI.new
-    link_type, _options, _objects = cli.parse_link_args(["static", "a.o", "b.o"])
+    options, _objects = cli.parse_link_args(["--static", "a.o", "b.o"])
 
-    assert_equal "static", link_type
+    assert_equal [:static], options[:flags]
   end
 
-  def test_parse_link_args_shared_type
+  def test_parse_link_args_shared_flag
     cli = MetaCC::CLI.new
-    link_type, _options, _objects = cli.parse_link_args(["shared", "util.o"])
+    options, _objects = cli.parse_link_args(["--shared", "util.o"])
 
-    assert_equal "shared", link_type
+    assert_equal [:shared], options[:flags]
+  end
+
+  def test_parse_link_args_objects_long_flag
+    cli = MetaCC::CLI.new
+    options, _objects = cli.parse_link_args(["--objects", "a.o"])
+
+    assert_equal [:objects], options[:flags]
+  end
+
+  def test_parse_link_args_objects_short_flag
+    cli = MetaCC::CLI.new
+    options, _objects = cli.parse_link_args(["-c", "a.o"])
+
+    assert_equal [:objects], options[:flags]
   end
 
   def test_parse_link_args_output_flag
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "-o", "myapp", "main.o"])
+    options, _objects = cli.parse_link_args(["-o", "myapp", "main.o"])
 
     assert_equal "myapp", options[:output]
   end
 
   def test_parse_link_args_object_files
     cli = MetaCC::CLI.new
-    _link_type, _options, objects = cli.parse_link_args(["static", "-o", "lib.a", "a.o", "b.o"])
+    _options, objects = cli.parse_link_args(["--static", "-o", "lib.a", "a.o", "b.o"])
 
     assert_equal ["a.o", "b.o"], objects
   end
 
-  def test_parse_link_args_invalid_type_exits
-    cli = MetaCC::CLI.new
-    assert_raises(SystemExit) do
-      cli.parse_link_args(["bogus", "main.o"])
-    end
-  end
-
   def test_parse_link_args_lib_short_flag
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "main.o"])
+    options, _objects = cli.parse_link_args(["-l", "m", "main.o"])
 
     assert_equal ["m"], options[:libs]
   end
 
   def test_parse_link_args_lib_long_flag
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "--lib", "pthread", "main.o"])
+    options, _objects = cli.parse_link_args(["--lib", "pthread", "main.o"])
 
     assert_equal ["pthread"], options[:libs]
   end
 
   def test_parse_link_args_multiple_libs
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "-l", "m", "-l", "pthread", "main.o"])
+    options, _objects = cli.parse_link_args(["-l", "m", "-l", "pthread", "main.o"])
 
     assert_equal ["m", "pthread"], options[:libs]
   end
 
   def test_parse_link_args_libdir_short_flag
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "-L", "/usr/local/lib", "main.o"])
+    options, _objects = cli.parse_link_args(["-L", "/usr/local/lib", "main.o"])
 
     assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_link_args_libdir_long_flag
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "--libdir", "/opt/lib", "main.o"])
+    options, _objects = cli.parse_link_args(["--libdir", "/opt/lib", "main.o"])
 
     assert_equal ["/opt/lib"], options[:linker_include_dirs]
   end
 
   def test_parse_link_args_libs_and_libdirs_defaults_to_empty
     cli = MetaCC::CLI.new
-    _link_type, options, _objects = cli.parse_link_args(["executable", "main.o"])
+    options, _objects = cli.parse_link_args(["main.o"])
 
     assert_equal [], options[:libs]
     assert_equal [], options[:linker_include_dirs]
@@ -406,7 +413,7 @@ class CLITest < Minitest::Test
 
   def test_run_link_executable_dispatches_correctly
     cli = TestCLI.new
-    cli.run(["link", "executable", "-o", "myapp", "a.o", "b.o"])
+    cli.run(["link", "-o", "myapp", "a.o", "b.o"])
 
     call = cli.stub_driver.calls.first
 
@@ -419,7 +426,7 @@ class CLITest < Minitest::Test
 
   def test_run_link_static_dispatches_correctly
     cli = TestCLI.new
-    cli.run(["link", "static", "-o", "lib.a", "a.o"])
+    cli.run(["link", "--static", "-o", "lib.a", "a.o"])
 
     assert_equal :invoke, cli.stub_driver.calls.first[:method]
     assert_includes cli.stub_driver.calls.first[:flags], :static
@@ -427,15 +434,31 @@ class CLITest < Minitest::Test
 
   def test_run_link_shared_dispatches_correctly
     cli = TestCLI.new
-    cli.run(["link", "shared", "-o", "lib.so", "a.o"])
+    cli.run(["link", "--shared", "-o", "lib.so", "a.o"])
 
     assert_equal :invoke, cli.stub_driver.calls.first[:method]
     assert_includes cli.stub_driver.calls.first[:flags], :shared
   end
 
+  def test_run_link_objects_long_flag_dispatches_correctly
+    cli = TestCLI.new
+    cli.run(["link", "--objects", "-o", "a.o", "a.c"])
+
+    assert_equal :invoke, cli.stub_driver.calls.first[:method]
+    assert_includes cli.stub_driver.calls.first[:flags], :objects
+  end
+
+  def test_run_link_objects_short_flag_dispatches_correctly
+    cli = TestCLI.new
+    cli.run(["link", "-c", "-o", "a.o", "a.c"])
+
+    assert_equal :invoke, cli.stub_driver.calls.first[:method]
+    assert_includes cli.stub_driver.calls.first[:flags], :objects
+  end
+
   def test_run_link_forwards_libs_and_linker_include_dirs
     cli = TestCLI.new
-    cli.run(["link", "executable", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
+    cli.run(["link", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
 
     call = cli.stub_driver.calls.first
 

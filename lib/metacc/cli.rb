@@ -8,11 +8,14 @@ module MetaCC
   # Command-line interface for the MetaCC Driver.
   #
   # Subcommands:
-  #   c   <sources...> -o <output> [options]         – compile C source file(s)
-  #   cxx <sources...> -o <output> [options]         – compile C++ source file(s)
-  #   link <type> <objects...> -o <output> [options] – link object files
+  #   c   <sources...> -o <output> [options]       – compile C source file(s)
+  #   cxx <sources...> -o <output> [options]       – compile C++ source file(s)
+  #   link <objects...> -o <output> [options]      – link object files (default: executable)
   #
-  # <type> for the link subcommand is one of: static, shared, executable
+  # Link output type flags (mutually exclusive; default produces an executable):
+  #   --shared           – produce a shared library
+  #   --static           – produce a static library
+  #   --objects / -c     – produce object files
   #
   # Recognised flags (passed to Driver#compile via flags:):
   #   -O0 -O1 -O2 -O3
@@ -90,9 +93,9 @@ module MetaCC
         driver = build_driver
         compile_sources(driver, sources, options)
       when "link"
-        link_type, options, objects = parse_link_args(argv)
+        options, objects = parse_link_args(argv)
         driver = build_driver
-        link_objects(driver, link_type, objects, options[:output], options[:libs], options[:linker_include_dirs])
+        link_objects(driver, objects, options[:output], options[:flags], options[:libs], options[:linker_include_dirs])
       else
         warn "Usage: metacc <c|cxx|link> [options] <files...>"
         exit 1
@@ -147,19 +150,15 @@ module MetaCC
     end
 
     # Parses link subcommand arguments.
-    # Returns [link_type_string, options_hash, remaining_positional_args].
+    # Returns [options_hash, remaining_positional_args].
+    # Output type defaults to executable; use --shared, --static, or --objects/-c to override.
     def parse_link_args(argv)
-      argv = argv.dup
-      link_type = argv.shift
-
-      unless %w[static shared executable].include?(link_type)
-        warn "Usage: metacc link <static|shared|executable> [options] <objects...>"
-        exit 1
-      end
-
-      options = { output: nil, libs: [], linker_include_dirs: [] }
+      options = { output: nil, libs: [], linker_include_dirs: [], flags: [] }
       parser = OptionParser.new do |opts|
         opts.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
+        opts.on("--shared", "Produce a shared library") { options[:flags] << :shared }
+        opts.on("--static", "Produce a static library") { options[:flags] << :static }
+        opts.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
         opts.on("-l LIB", "--lib LIB", "Link against library LIB") do |v|
           options[:libs] << v
         end
@@ -169,7 +168,7 @@ module MetaCC
       end
       objects = parser.parse(argv)
 
-      [link_type, options, objects]
+      [options, objects]
     end
 
     private
@@ -192,12 +191,7 @@ module MetaCC
       end
     end
 
-    def link_objects(driver, link_type, objects, output, libs = [], linker_include_dirs = [])
-      flags = case link_type
-      when "executable" then []
-      when "static"     then [:static]
-      when "shared"     then [:shared]
-      end
+    def link_objects(driver, objects, output, flags = [], libs = [], linker_include_dirs = [])
       success = driver.invoke(objects, output, flags:, libs:, linker_include_dirs:)
       exit 1 unless success
     end
