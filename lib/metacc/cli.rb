@@ -184,7 +184,6 @@ module MetaCC
 
     def compile_sources(driver, sources, options)
       sources.each do |source|
-        output = options[:output] || default_object_path(source)
         success = driver.invoke(
           source,
           options[:output],
@@ -197,10 +196,6 @@ module MetaCC
         )
         exit 1 unless success
       end
-    end
-
-    def default_object_path(source)
-      source.sub(/\.[^.]+\z/, ".o")
     end
 
   end
