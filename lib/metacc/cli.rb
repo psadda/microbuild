@@ -93,7 +93,7 @@ module MetaCC
       new.run(argv)
     end
 
-    def run(argv)
+    def run(argv, driver: Driver.new)
       argv = argv.dup
       subcommand = argv.shift
 
@@ -101,7 +101,6 @@ module MetaCC
       when "c", "cxx"
         options, input_paths = parse_compile_args(argv, subcommand)
         output_path = options.delete(:output_path)
-        driver = build_driver
         invoke(driver, input_paths, output_path, options)
       else
         warn "Usage: metacc <c|cxx> [options] <files...>"
@@ -129,10 +128,6 @@ module MetaCC
     end
 
     private
-
-    def build_driver
-      Driver.new
-    end
 
     def setup_compile_options(parser, options, standards)
       parser.on("-o FILEPATH", "Output file path") do |value|
