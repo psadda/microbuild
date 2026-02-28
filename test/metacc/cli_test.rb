@@ -2,6 +2,7 @@
 
 require "test_helper"
 require "tmpdir"
+require "stringio"
 require "metacc/cli"
 
 class CLITest < Minitest::Test
@@ -432,6 +433,18 @@ class CLITest < Minitest::Test
     assert_raises(SystemExit) { cli.run([]) }
   end
 
+  def test_run_version_flag_writes_version_to_stdout
+    cli = TestCLI.new
+    old_stdout = $stdout
+    $stdout = StringIO.new
+    begin
+      cli.run(["--version"])
+      assert_equal "stubbed compiler 1.0.0\n", $stdout.string
+    ensure
+      $stdout = old_stdout
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # run – compile/link subcommands dispatch to driver with correct arguments
   #
@@ -448,6 +461,10 @@ class CLITest < Minitest::Test
 
     def initialize
       @calls = []
+    end
+
+    def show_version
+      "stubbed compiler 1.0.0\n"
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],

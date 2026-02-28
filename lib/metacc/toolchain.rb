@@ -31,6 +31,13 @@ module MetaCC
       false
     end
 
+    # Returns the compiler version string by running the compiler with --version.
+    # Returns stdout if non-empty, otherwise stderr.
+    def show_version
+      stdout, stderr, = Open3.capture3(c, "--version")
+      stdout.empty? ? stderr : stdout
+    end
+
     # Returns a Hash mapping universal flags to native flags for this toolchain.
     def flags
       raise NotImplementedError, "#{self.class}#flags not implemented"
@@ -199,6 +206,12 @@ module MetaCC
 
     def flags
       MSVC_FLAGS
+    end
+
+    # MSVC prints its version banner to stderr when invoked with no arguments.
+    def show_version
+      _stdout, stderr, = Open3.capture3(c)
+      stderr
     end
 
     private
