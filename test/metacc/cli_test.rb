@@ -314,7 +314,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-L", "/usr/local/lib", "main.c"])
 
-    assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
+    assert_equal ["/usr/local/lib"], options[:linker_paths]
   end
 
   def test_parse_compile_args_libs_and_libdirs_default_to_empty
@@ -322,7 +322,7 @@ class CLITest < Minitest::Test
     options, _sources = cli.parse_compile_args(["main.c"])
 
     assert_equal [], options[:libs]
-    assert_equal [], options[:linker_include_dirs]
+    assert_equal [], options[:linker_paths]
   end
 
   # ---------------------------------------------------------------------------
@@ -381,7 +381,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _objects = cli.parse_link_args(["-L", "/usr/local/lib", "main.o"])
 
-    assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
+    assert_equal ["/usr/local/lib"], options[:linker_paths]
   end
 
   def test_parse_link_args_libs_and_libdirs_defaults_to_empty
@@ -389,7 +389,7 @@ class CLITest < Minitest::Test
     options, _objects = cli.parse_link_args(["main.o"])
 
     assert_equal [], options[:libs]
-    assert_equal [], options[:linker_include_dirs]
+    assert_equal [], options[:linker_paths]
   end
 
   def test_parse_link_args_strip_long_flag
@@ -468,10 +468,10 @@ class CLITest < Minitest::Test
       @toolchain = StubToolchain.new
     end
 
-    def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],
-               libs: [], linker_include_dirs: [], **)
+    def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
+               libs: [], linker_paths: [], **)
       @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, definitions:, libs:, linker_include_dirs: }
+                  include_paths:, defs:, libs:, linker_paths: }
       true
     end
 
@@ -568,7 +568,7 @@ class CLITest < Minitest::Test
     call = cli.stub_driver.calls.first
 
     assert_equal ["/inc"], call[:include_paths]
-    assert_equal ["FOO=1"], call[:definitions]
+    assert_equal ["FOO=1"], call[:defs]
   end
 
   def test_run_compile_forwards_xflags
@@ -587,7 +587,7 @@ class CLITest < Minitest::Test
     call = cli.stub_driver.calls.first
 
     assert_equal ["m"],        call[:libs]
-    assert_equal ["/opt/lib"], call[:linker_include_dirs]
+    assert_equal ["/opt/lib"], call[:linker_paths]
   end
 
   def test_run_compile_default_output_path
@@ -633,7 +633,7 @@ class CLITest < Minitest::Test
     call = cli.stub_driver.calls.first
 
     assert_equal ["m", "pthread"], call[:libs]
-    assert_equal ["/opt/lib"],     call[:linker_include_dirs]
+    assert_equal ["/opt/lib"],     call[:linker_paths]
   end
 
 end

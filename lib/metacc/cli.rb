@@ -106,7 +106,7 @@ module MetaCC
       when "link"
         options, objects = parse_link_args(argv)
         driver = build_driver
-        link_objects(driver, objects, options[:output], options[:flags], options[:libs], options[:linker_include_dirs])
+        link_objects(driver, objects, options[:output], options[:flags], options[:libs], options[:linker_paths])
       else
         warn "Usage: metacc <c|cxx|link> [options] <files...>"
         exit 1
@@ -117,7 +117,7 @@ module MetaCC
     # Returns [options_hash, remaining_positional_args].
     def parse_compile_args(argv, subcommand = "c")
       options = { includes: [], defines: [], output: nil, flags: [], xflags: {},
-                  libs: [], linker_include_dirs: [] }
+                  libs: [], linker_paths: [] }
       standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
       setup_link_options(parser, options)
@@ -130,7 +130,7 @@ module MetaCC
     # Returns [options_hash, remaining_positional_args].
     # Output type defaults to executable; use --shared or --static to override.
     def parse_link_args(argv)
-      options = { output: nil, libs: [], linker_include_dirs: [], flags: [] }
+      options = { output: nil, libs: [], linker_paths: [], flags: [] }
       parser = OptionParser.new
       setup_link_options(parser, options)
       objects = parser.permute(argv)
@@ -140,7 +140,7 @@ module MetaCC
     private
 
     def build_driver
-      Driver.new(stdout_sink: $stdout, stderr_sink: $stderr)
+      Driver.new
     end
 
     # Registers options common to all subcommands (output path, link type, libs).
@@ -150,7 +150,7 @@ module MetaCC
       parser.on("--static", "Produce a static library") { options[:flags] << :static }
       parser.on("-s", "--strip", "Strip unneeded symbols") { options[:flags] << :strip }
       parser.on("-l LIB", "Link against library LIB") { |v| options[:libs] << v }
-      parser.on("-L DIR", "Add linker library search path") { |v| options[:linker_include_dirs] << v }
+      parser.on("-L DIR", "Add linker library search path") { |v| options[:linker_paths] << v }
     end
 
     # Registers compile-only options (include paths, defines, code-gen flags, etc.).
@@ -184,16 +184,16 @@ module MetaCC
           flags:               (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
           xflags:              options[:xflags],
           include_paths:       options[:includes],
-          definitions:         options[:defines],
+          defs:                options[:defines],
           libs:                options[:libs],
-          linker_include_dirs: options[:linker_include_dirs]
+          linker_paths:        options[:linker_paths]
         )
         exit 1 unless success
       end
     end
 
-    def link_objects(driver, objects, output, flags = [], libs = [], linker_include_dirs = [])
-      success = driver.invoke(objects, output, flags:, libs:, linker_include_dirs:)
+    def link_objects(driver, objects, output, flags = [], libs = [], linker_paths = [])
+      success = driver.invoke(objects, output, flags:, libs:, linker_paths:)
       exit 1 unless success
     end
 
