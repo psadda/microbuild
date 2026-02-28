@@ -33,11 +33,11 @@ module MetaCC
     #
     # @param prefer       [Array<Class>] toolchain classes to probe, in priority order.
     #                                   Each element must be a Class derived from Toolchain.
-    #                                   Defaults to [ClangToolchain, GnuToolchain, MsvcToolchain].
+    #                                   Defaults to [Clang, GNU, MSVC].
     # @param search_paths [Array<String>] directories to search for toolchain executables
     #                                    before falling back to PATH. Defaults to [].
     # @raise [CompilerNotFoundError] if no supported compiler is found.
-    def initialize(prefer: [ClangToolchain, GnuToolchain, MsvcToolchain],
+    def initialize(prefer: [Clang, GNU, MSVC],
                    search_paths: [])
       @toolchain = select_toolchain!(prefer, search_paths)
     end

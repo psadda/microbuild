@@ -10,7 +10,7 @@ require "metacc/toolchain"
 class MsvcToolchainTest < Minitest::Test
 
   # ---------------------------------------------------------------------------
-  # Helper: minimal MsvcToolchain subclass that prevents real subprocess calls.
+  # Helper: minimal MSVC subclass that prevents real subprocess calls.
   #
   # Only command_available?, run_vswhere, and run_vcvarsall are overridden.
   # All other methods (setup_msvc_environment, find_vcvarsall, load_vcvarsall)
@@ -18,7 +18,7 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def stub_msvc_class(cl_on_path: false, &block)
-    klass = Class.new(MetaCC::MsvcToolchain) do
+    klass = Class.new(MetaCC::MSVC) do
       define_method(:command_available?) do |cmd|
         cl_on_path && cmd == "cl"
       end
@@ -35,7 +35,7 @@ class MsvcToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_setup_when_cl_already_available
-    klass = Class.new(MetaCC::MsvcToolchain) do
+    klass = Class.new(MetaCC::MSVC) do
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
@@ -45,7 +45,7 @@ class MsvcToolchainTest < Minitest::Test
   end
 
   def test_available_returns_true_when_cl_is_on_path
-    klass = Class.new(MetaCC::MsvcToolchain) do
+    klass = Class.new(MetaCC::MSVC) do
       define_method(:command_available?) { |cmd| cmd == "cl" }
     end
     tc = klass.new
@@ -92,11 +92,11 @@ class MsvcToolchainTest < Minitest::Test
   # vcvarsall_command: cmd.exe command string construction
   # ---------------------------------------------------------------------------
 
-  # Helper: minimal MsvcToolchain instance with only the pure vcvarsall_command
+  # Helper: minimal MSVC instance with only the pure vcvarsall_command
   # method available.  Defines its own initialize to avoid the pre-existing
-  # super arity issue in MsvcToolchain#initialize.
+  # super arity issue in MSVC#initialize.
   def msvc_for_vcvarsall_command
-    Class.new(MetaCC::MsvcToolchain) do
+    Class.new(MetaCC::MSVC) do
       def command_available?(_cmd) = false
       def run_vswhere(*)   = nil
       def run_vcvarsall(*) = nil
@@ -175,7 +175,7 @@ class MsvcToolchainTest < Minitest::Test
 
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-      klass = Class.new(MetaCC::MsvcToolchain) do
+      klass = Class.new(MetaCC::MSVC) do
         define_method(:command_available?) do |cmd|
           setup_done && cmd == "cl"
         end
@@ -200,14 +200,14 @@ class MsvcToolchainTest < Minitest::Test
 
 end
 
-class ClangclToolchainTest < Minitest::Test
+class ClangCLToolchainTest < Minitest::Test
 
   # ---------------------------------------------------------------------------
-  # Helper: minimal ClangclToolchain subclass that prevents real subprocess calls.
+  # Helper: minimal ClangCL subclass that prevents real subprocess calls.
   # ---------------------------------------------------------------------------
 
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
-    klass = Class.new(MetaCC::ClangclToolchain) do
+    klass = Class.new(MetaCC::ClangCL) do
       define_method(:command_available?) do |cmd|
         clang_cl_on_path && cmd == "clang-cl"
       end
@@ -249,7 +249,7 @@ class ClangclToolchainTest < Minitest::Test
   def test_flags_returns_clang_cl_flags
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
-    assert_equal MetaCC::ClangclToolchain::CLANG_CL_FLAGS, tc.flags
+    assert_equal MetaCC::ClangCL::CLANG_CL_FLAGS, tc.flags
   end
 
   # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ class ClangclToolchainTest < Minitest::Test
 
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-      klass = Class.new(MetaCC::ClangclToolchain) do
+      klass = Class.new(MetaCC::ClangCL) do
         define_method(:command_available?) do |cmd|
           setup_done && cmd == "clang-cl"
         end
@@ -297,7 +297,7 @@ class GnuToolchainCommandTest < Minitest::Test
   # GnuToolchain#command is a pure method – no subprocess calls needed.
 
   def gnu
-    Class.new(MetaCC::GnuToolchain) do
+    Class.new(MetaCC::GNU) do
       def command_available?(_cmd) = true
     end.new
   end
@@ -375,17 +375,17 @@ class GnuToolchainCommandTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_strip_flag_maps_to_wl_strip_unneeded
-    assert_equal ["-Wl,--strip-unneeded"], MetaCC::GnuToolchain::GNU_FLAGS[:strip]
+    assert_equal ["-Wl,--strip-unneeded"], MetaCC::GNU::GNU_FLAGS[:strip]
   end
 
 end
 
 class MsvcToolchainCommandTest < Minitest::Test
 
-  # Override initialize to avoid the super arity issue in MsvcToolchain#initialize,
+  # Override initialize to avoid the super arity issue in MSVC#initialize,
   # following the same pattern as msvc_for_vcvarsall_command in MsvcToolchainTest.
   def msvc
-    Class.new(MetaCC::MsvcToolchain) do
+    Class.new(MetaCC::MSVC) do
       def command_available?(_cmd) = false
       def run_vswhere(*)   = nil
       def run_vcvarsall(*) = nil
@@ -438,7 +438,7 @@ class MsvcToolchainCommandTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_strip_flag_maps_to_empty_array
-    assert_equal [], MetaCC::MsvcToolchain::MSVC_FLAGS[:strip]
+    assert_equal [], MetaCC::MSVC::MSVC_FLAGS[:strip]
   end
 
 end
@@ -450,7 +450,7 @@ class ToolchainLanguagesTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_gnu_toolchain_supports_c_and_cxx
-    tc = Class.new(MetaCC::GnuToolchain) do
+    tc = Class.new(MetaCC::GNU) do
       def command_available?(_cmd) = true
     end.new
 
@@ -458,7 +458,7 @@ class ToolchainLanguagesTest < Minitest::Test
   end
 
   def test_clang_toolchain_supports_c_and_cxx
-    tc = Class.new(MetaCC::ClangToolchain) do
+    tc = Class.new(MetaCC::Clang) do
       def command_available?(_cmd) = true
     end.new
 
@@ -466,7 +466,7 @@ class ToolchainLanguagesTest < Minitest::Test
   end
 
   def test_msvc_toolchain_supports_c_and_cxx
-    tc = Class.new(MetaCC::MsvcToolchain) do
+    tc = Class.new(MetaCC::MSVC) do
       def command_available?(_cmd) = false
       def run_vswhere(*)   = nil
       def run_vcvarsall(*) = nil
@@ -476,7 +476,7 @@ class ToolchainLanguagesTest < Minitest::Test
   end
 
   def test_clang_cl_toolchain_supports_c_and_cxx
-    tc = Class.new(MetaCC::ClangclToolchain) do
+    tc = Class.new(MetaCC::ClangCL) do
       def command_available?(_cmd) = false
       def run_vswhere(*)   = nil
       def run_vcvarsall(*) = nil
@@ -490,7 +490,7 @@ class ToolchainLanguagesTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_tinycc_toolchain_supports_c_only
-    tc = Class.new(MetaCC::TinyccToolchain) do
+    tc = Class.new(MetaCC::TinyCC) do
       def command_available?(_cmd) = true
     end.new
 
@@ -499,10 +499,10 @@ class ToolchainLanguagesTest < Minitest::Test
 
 end
 
-class TinyccToolchainTest < Minitest::Test
+class TinyCCToolchainTest < Minitest::Test
 
   def tcc
-    Class.new(MetaCC::TinyccToolchain) do
+    Class.new(MetaCC::TinyCC) do
       def command_available?(_cmd) = true
     end.new
   end
@@ -524,7 +524,7 @@ class TinyccToolchainTest < Minitest::Test
   end
 
   def test_not_available_when_tcc_absent
-    tc = Class.new(MetaCC::TinyccToolchain) do
+    tc = Class.new(MetaCC::TinyCC) do
       def command_available?(_cmd) = false
     end.new
 
@@ -592,23 +592,23 @@ class TinyccToolchainTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_flags_returns_tinycc_flags
-    assert_equal MetaCC::TinyccToolchain::TINYCC_FLAGS, tcc.flags
+    assert_equal MetaCC::TinyCC::TINYCC_FLAGS, tcc.flags
   end
 
   def test_objects_flag_maps_to_dash_c
-    assert_equal ["-c"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:objects]
+    assert_equal ["-c"], MetaCC::TinyCC::TINYCC_FLAGS[:objects]
   end
 
   def test_shared_flag_maps_to_dash_shared
-    assert_equal ["-shared"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:shared]
+    assert_equal ["-shared"], MetaCC::TinyCC::TINYCC_FLAGS[:shared]
   end
 
   def test_debug_flag_maps_to_dash_g
-    assert_equal ["-g"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:debug]
+    assert_equal ["-g"], MetaCC::TinyCC::TINYCC_FLAGS[:debug]
   end
 
   def test_o3_maps_to_o2_since_tcc_lacks_o3
-    assert_equal ["-O2"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:o3]
+    assert_equal ["-O2"], MetaCC::TinyCC::TINYCC_FLAGS[:o3]
   end
 
 end

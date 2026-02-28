@@ -35,10 +35,10 @@ module MetaCC
   #   --asan --ubsan --msan
   #
   # Toolchain-specific flags (passed to Driver#compile via xflags:):
-  #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
-  #   --xgnu  VALUE     – appended to xflags[GnuToolchain]
-  #   --xclang VALUE    – appended to xflags[ClangToolchain]
-  #   --xclangcl VALUE  – appended to xflags[ClangclToolchain]
+  #   --xmsvc VALUE     – appended to xflags[MSVC]
+  #   --xgnu  VALUE     – appended to xflags[GNU]
+  #   --xclang VALUE    – appended to xflags[Clang]
+  #   --xclangcl VALUE  – appended to xflags[ClangCL]
   class CLI
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
@@ -86,10 +86,10 @@ module MetaCC
 
     # Maps --x<name> CLI option names to xflags toolchain-class keys.
     XFLAGS = {
-      "xmsvc" =>    MsvcToolchain,
-      "xgnu" =>     GnuToolchain,
-      "xclang" =>   ClangToolchain,
-      "xclangcl" => ClangclToolchain
+      "xmsvc" =>    MSVC,
+      "xgnu" =>     GNU,
+      "xclang" =>   Clang,
+      "xclangcl" => ClangCL
     }.freeze
 
     def run(argv, driver: Driver.new)
