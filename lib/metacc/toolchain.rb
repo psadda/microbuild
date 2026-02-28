@@ -37,14 +37,14 @@ module MetaCC
 
     # Returns a Hash mapping universal flags to native flags for this toolchain.
     def flags
-      raise NotImplementedError, "#{self.class}#flags not implemented"
+      raise RuntimeError, "#{self.class}#flags not implemented"
     end
 
     # Returns the full command array for the given inputs, output, and flags.
     # The output mode (object files, shared library, static library, or
     # executable) is determined by the translated flags.
     def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
-      raise NotImplementedError, "#{self.class}#command not implemented"
+      raise RuntimeError, "#{self.class}#command not implemented"
     end
 
     private
