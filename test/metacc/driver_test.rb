@@ -17,7 +17,7 @@ class DriverTest < Minitest::Test
   def test_compiler_class_is_known
     builder = MetaCC::Driver.new
 
-    assert_includes [MetaCC::ClangToolchain, MetaCC::GnuToolchain, MetaCC::MsvcToolchain], builder.toolchain.class
+    assert_includes [MetaCC::Clang, MetaCC::GNU, MetaCC::MSVC], builder.toolchain.class
   end
 
   def test_compiler_is_compiler_info_struct
@@ -142,7 +142,7 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_invoke_shared_creates_shared_library
     builder = MetaCC::Driver.new
-    skip("MSVC shared linking not tested here") if builder.toolchain.is_a?(MetaCC::MsvcToolchain)
+    skip("MSVC shared linking not tested here") if builder.toolchain.is_a?(MetaCC::MSVC)
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -222,9 +222,9 @@ class DriverTest < Minitest::Test
   # prefer: constructor option
   # ---------------------------------------------------------------------------
   def test_prefer_selects_specified_toolchain_class
-    builder = MetaCC::Driver.new(prefer: [MetaCC::GnuToolchain])
+    builder = MetaCC::Driver.new(prefer: [MetaCC::GNU])
 
-    assert_instance_of MetaCC::GnuToolchain, builder.toolchain
+    assert_instance_of MetaCC::GNU, builder.toolchain
   end
 
   def test_prefer_empty_raises_compiler_not_found
@@ -234,7 +234,7 @@ class DriverTest < Minitest::Test
   def test_prefer_default_is_clang_gnu_msvc_order
     builder = MetaCC::Driver.new
 
-    assert_includes [MetaCC::ClangToolchain, MetaCC::GnuToolchain, MetaCC::MsvcToolchain],
+    assert_includes [MetaCC::Clang, MetaCC::GNU, MetaCC::MSVC],
                     builder.toolchain.class
   end
 
@@ -256,7 +256,7 @@ class DriverTest < Minitest::Test
       File.chmod(0o755, fake_gcc)
 
       builder = MetaCC::Driver.new(
-        prefer:       [MetaCC::GnuToolchain],
+        prefer:       [MetaCC::GNU],
         search_paths: [dir]
       )
 

@@ -251,39 +251,39 @@ class CLITest < Minitest::Test
   def test_xmsvc_single_value
     call = first_call(run_cli(["c", "--xmsvc", "Z7", "-o", "out", "main.c"]))
 
-    assert_equal ["Z7"], call[:xflags][MetaCC::MsvcToolchain]
+    assert_equal ["Z7"], call[:xflags][MetaCC::MSVC]
   end
 
   def test_xmsvc_multiple_values
     call = first_call(run_cli(["c", "--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "out", "main.c"]))
 
-    assert_equal ["Z7", "/EHc"], call[:xflags][MetaCC::MsvcToolchain]
+    assert_equal ["Z7", "/EHc"], call[:xflags][MetaCC::MSVC]
   end
 
   def test_xgnu_flag
     call = first_call(run_cli(["c", "--xgnu", "-march=skylake", "-o", "out", "main.c"]))
 
-    assert_equal ["-march=skylake"], call[:xflags][MetaCC::GnuToolchain]
+    assert_equal ["-march=skylake"], call[:xflags][MetaCC::GNU]
   end
 
   def test_xclang_flag
     call = first_call(run_cli(["c", "--xclang", "-fcolor-diagnostics", "-o", "out", "main.c"]))
 
-    assert_equal ["-fcolor-diagnostics"], call[:xflags][MetaCC::ClangToolchain]
+    assert_equal ["-fcolor-diagnostics"], call[:xflags][MetaCC::Clang]
   end
 
   def test_xclangcl_flag
     call = first_call(run_cli(["c", "--xclangcl", "/Ot", "-o", "out", "main.c"]))
 
-    assert_equal ["/Ot"], call[:xflags][MetaCC::ClangclToolchain]
+    assert_equal ["/Ot"], call[:xflags][MetaCC::ClangCL]
   end
 
   def test_mixed_xflags
     call = first_call(run_cli(["c", "--xmsvc", "Z7", "--xgnu", "-funroll-loops", "--xmsvc", "/EHc",
                                "-o", "out", "main.c"]))
 
-    assert_equal ["Z7", "/EHc"],     call[:xflags][MetaCC::MsvcToolchain]
-    assert_equal ["-funroll-loops"], call[:xflags][MetaCC::GnuToolchain]
+    assert_equal ["Z7", "/EHc"],     call[:xflags][MetaCC::MSVC]
+    assert_equal ["-funroll-loops"], call[:xflags][MetaCC::GNU]
   end
 
   # ---------------------------------------------------------------------------

@@ -75,7 +75,7 @@ module MetaCC
   end
 
   # GNU-compatible toolchain (gcc).
-  class GnuToolchain < Toolchain
+  class GNU < Toolchain
 
     def initialize(search_paths: [])
       super
@@ -139,7 +139,7 @@ module MetaCC
   end
 
   # Clang toolchain – identical command structure to GNU.
-  class ClangToolchain < GnuToolchain
+  class Clang < GNU
 
     def initialize(search_paths: [])
       super
@@ -156,7 +156,7 @@ module MetaCC
   end
 
   # Microsoft Visual C++ toolchain.
-  class MsvcToolchain < Toolchain
+  class MSVC < Toolchain
 
     # Default location of the Visual Studio Installer's vswhere utility.
     VSWHERE_PATH = File.join(
@@ -322,7 +322,7 @@ module MetaCC
 
   # clang-cl toolchain – uses clang-cl compiler with MSVC-compatible flags and
   # environment setup.
-  class ClangclToolchain < MsvcToolchain
+  class ClangCL < MSVC
 
     def initialize(search_paths: [])
       super("clang-cl", search_paths:)
@@ -340,7 +340,7 @@ module MetaCC
   end
 
   # TinyCC toolchain (tcc).  TinyCC only supports C, not C++.
-  class TinyccToolchain < Toolchain
+  class TinyCC < Toolchain
 
     def initialize(search_paths: [])
       super
