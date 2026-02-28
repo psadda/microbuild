@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "open3"
-
 module MetaCC
 
   # Base class for compiler toolchains.
@@ -28,17 +26,13 @@ module MetaCC
     def command_available?(command)
       return false if command.nil?
 
-      Open3.capture3(command, "--version")
-      true
-    rescue Errno::ENOENT
-      false
+      !system(command, "--version", out: File::NULL, err: File::NULL).nil?
     end
 
     # Returns the compiler version string by running the compiler with --version.
     # Returns stdout if non-empty, otherwise stderr.
     def show_version
-      stdout, stderr, = Open3.capture3(c, "--version")
-      stdout.empty? ? stderr : stdout
+      IO.popen([c, "--version", err: :out], &:read)
     end
 
     # Returns a Hash mapping universal flags to native flags for this toolchain.
@@ -222,8 +216,7 @@ module MetaCC
 
     # MSVC prints its version banner to stderr when invoked with no arguments.
     def show_version
-      _stdout, stderr, = Open3.capture3(c)
-      stderr
+      IO.popen([c, err: :out], &:read)
     end
 
     private
@@ -252,10 +245,11 @@ module MetaCC
 
     # Runs vswhere.exe with the given arguments and returns the trimmed stdout,
     # or nil if vswhere.exe is absent, the command fails, or produces no output.
-    def run_vswhere(*)
+    def run_vswhere(*args)
       return nil unless File.exist?(VSWHERE_PATH)
 
-      stdout, _, status = Open3.capture3(VSWHERE_PATH, *)
+      stdout = IO.popen([VSWHERE_PATH, *args], &:read)
+      status = $?
       return nil unless status.success?
 
       path = stdout.strip
@@ -279,7 +273,8 @@ module MetaCC
     # environment variables into the current process's ENV so that cl.exe
     # and related tools become available on PATH.
     def run_vcvarsall(vcvarsall)
-      stdout, _, status = Open3.capture3("cmd.exe", "/c", vcvarsall_command(vcvarsall))
+      stdout = IO.popen(["cmd.exe", "/c", vcvarsall_command(vcvarsall)], &:read)
+      status = $?
       return unless status.success?
 
       load_vcvarsall(stdout)
