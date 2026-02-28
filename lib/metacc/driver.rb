@@ -56,6 +56,7 @@ module MetaCC
     # @param linker_paths   [Array<String>] linker library search paths (-L / /LIBPATH:)
     # @param env            [Hash] environment variables to set for the subprocess
     # @param working_dir    [String] working directory for the subprocess (default: ".")
+    # @param language        [:c, :cxx] the source language; selects the C or C++ compiler executable
     # @return [Boolean] true if invocation succeeded, false otherwise
     def invoke(
       input_files,
@@ -67,13 +68,14 @@ module MetaCC
       libs: [],
       linker_paths: [],
       env: {},
-      working_dir: "."
+      working_dir: ".",
+      language: :c
     )
       input_files = Array(input_files)
       flags = translate_flags(flags)
       flags.concat(xflags[@toolchain.class] || [])
 
-      cmd = @toolchain.command(input_files, output_path, flags, include_paths, defs, libs, linker_paths)
+      cmd = @toolchain.command(input_files, output_path, flags, include_paths, defs, libs, linker_paths, language:)
       run_command(cmd, env:, working_dir:)
     end
 

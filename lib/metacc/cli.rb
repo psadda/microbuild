@@ -38,7 +38,7 @@ module MetaCC
   #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
   #   --xgnu  VALUE     – appended to xflags[GnuToolchain]
   #   --xclang VALUE    – appended to xflags[ClangToolchain]
-  #   --xclangcl VALUE  – appended to xflags[ClangClToolchain]
+  #   --xclangcl VALUE  – appended to xflags[ClangclToolchain]
   class CLI
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
@@ -86,7 +86,7 @@ module MetaCC
       "xmsvc" =>    MsvcToolchain,
       "xgnu" =>     GnuToolchain,
       "xclang" =>   ClangToolchain,
-      "xclangcl" => ClangClToolchain
+      "xclangcl" => ClangclToolchain
     }.freeze
 
     def run(argv, driver: Driver.new)
@@ -97,7 +97,8 @@ module MetaCC
       when "c", "cxx"
         options, input_paths = parse_compile_args(argv, subcommand)
         output_path = options.delete(:output_path)
-        invoke(driver, input_paths, output_path, options)
+        language = subcommand == "cxx" ? :cxx : :c
+        invoke(driver, input_paths, output_path, options, language:)
       else
         warn "Usage: metacc <c|cxx> [options] <files...>"
         exit 1
@@ -181,8 +182,8 @@ module MetaCC
       end
     end
 
-    def invoke(driver, input_paths, output_path, options)
-      success = driver.invoke(sources, output_path, **options)
+    def invoke(driver, input_paths, output_path, options, language: :c)
+      success = driver.invoke(input_paths, output_path, language:, **options)
       exit 1 unless success
     end
 

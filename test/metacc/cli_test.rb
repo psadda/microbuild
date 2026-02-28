@@ -160,7 +160,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xclangcl", "/Ot", "main.c"])
 
-    assert_equal ["/Ot"], options[:xflags][MetaCC::ClangClToolchain]
+    assert_equal ["/Ot"], options[:xflags][MetaCC::ClangclToolchain]
   end
 
   def test_parse_compile_args_mixed_xflags
@@ -448,7 +448,7 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   # run – compile/link subcommands dispatch to driver with correct arguments
   #
-  # Uses a TestCLI subclass that overrides build_driver to return a StubDriver.
+  # Uses a TestCLI subclass that overrides run to inject a StubDriver.
   # The StubDriver overrides only the Driver methods that call subprocesses,
   # recording their arguments so tests can assert on observable postconditions
   # without triggering real compiler invocations.
@@ -471,9 +471,9 @@ class CLITest < Minitest::Test
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
-               libs: [], linker_paths: [], **)
+               libs: [], linker_paths: [], language: :c, **)
       @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, defs:, libs:, linker_paths: }
+                  include_paths:, defs:, libs:, linker_paths:, language: }
       true
     end
 
@@ -484,10 +484,9 @@ class CLITest < Minitest::Test
 
     attr_reader :stub_driver
 
-    private
-
-    def build_driver
+    def run(argv, driver: nil)
       @stub_driver = StubDriver.new
+      super(argv, driver: @stub_driver)
     end
 
   end
@@ -502,6 +501,20 @@ class CLITest < Minitest::Test
     assert_equal "main.c", call[:input_files].first
     assert_equal "main.o", call[:output]
     assert_includes call[:flags], :objects
+  end
+
+  def test_run_c_passes_language_c
+    cli = TestCLI.new
+    cli.run(["c", "-o", "main.o", "main.c"])
+
+    assert_equal :c, cli.stub_driver.calls.first[:language]
+  end
+
+  def test_run_cxx_passes_language_cxx
+    cli = TestCLI.new
+    cli.run(["cxx", "-o", "hello.o", "hello.cpp"])
+
+    assert_equal :cxx, cli.stub_driver.calls.first[:language]
   end
 
   def test_run_cxx_dispatches_invoke

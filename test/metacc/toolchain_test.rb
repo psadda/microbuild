@@ -200,14 +200,14 @@ class MsvcToolchainTest < Minitest::Test
 
 end
 
-class ClangClToolchainTest < Minitest::Test
+class ClangclToolchainTest < Minitest::Test
 
   # ---------------------------------------------------------------------------
-  # Helper: minimal ClangClToolchain subclass that prevents real subprocess calls.
+  # Helper: minimal ClangclToolchain subclass that prevents real subprocess calls.
   # ---------------------------------------------------------------------------
 
   def stub_clang_cl_class(clang_cl_on_path: false, &block)
-    klass = Class.new(MetaCC::ClangClToolchain) do
+    klass = Class.new(MetaCC::ClangclToolchain) do
       define_method(:command_available?) do |cmd|
         clang_cl_on_path && cmd == "clang-cl"
       end
@@ -249,7 +249,7 @@ class ClangClToolchainTest < Minitest::Test
   def test_flags_returns_clang_cl_flags
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
-    assert_equal MetaCC::ClangClToolchain::CLANG_CL_FLAGS, tc.flags
+    assert_equal MetaCC::ClangclToolchain::CLANG_CL_FLAGS, tc.flags
   end
 
   # ---------------------------------------------------------------------------
@@ -268,7 +268,7 @@ class ClangClToolchainTest < Minitest::Test
 
       devenv = File.join(dir, "Common7", "IDE", "devenv.exe")
 
-      klass = Class.new(MetaCC::ClangClToolchain) do
+      klass = Class.new(MetaCC::ClangclToolchain) do
         define_method(:command_available?) do |cmd|
           setup_done && cmd == "clang-cl"
         end
@@ -334,6 +334,40 @@ class GnuToolchainCommandTest < Minitest::Test
     cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], ["/opt/lib"])
 
     refute_includes cmd, "-L/opt/lib"
+  end
+
+  # ---------------------------------------------------------------------------
+  # language: executable selection
+  # ---------------------------------------------------------------------------
+
+  def test_language_c_uses_c_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :c)
+
+    assert_equal "gcc", cmd.first
+  end
+
+  def test_language_cxx_uses_cxx_compiler
+    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :cxx)
+
+    assert_equal "g++", cmd.first
+  end
+
+  def test_language_c_on_cpp_file_still_uses_c_compiler
+    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :c)
+
+    assert_equal "gcc", cmd.first
+  end
+
+  def test_language_cxx_on_c_file_uses_cxx_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :cxx)
+
+    assert_equal "g++", cmd.first
+  end
+
+  def test_language_defaults_to_c_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [])
+
+    assert_equal "gcc", cmd.first
   end
 
   # ---------------------------------------------------------------------------
@@ -442,7 +476,7 @@ class ToolchainLanguagesTest < Minitest::Test
   end
 
   def test_clang_cl_toolchain_supports_c_and_cxx
-    tc = Class.new(MetaCC::ClangClToolchain) do
+    tc = Class.new(MetaCC::ClangclToolchain) do
       def command_available?(_cmd) = false
       def run_vswhere(*)   = nil
       def run_vcvarsall(*) = nil
