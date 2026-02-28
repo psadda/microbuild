@@ -38,7 +38,7 @@ module MetaCC
   #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
   #   --xgnu  VALUE     – appended to xflags[GnuToolchain]
   #   --xclang VALUE    – appended to xflags[ClangToolchain]
-  #   --xclangcl VALUE  – appended to xflags[ClangClToolchain]
+  #   --xclangcl VALUE  – appended to xflags[ClangclToolchain]
   class CLI
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
@@ -86,10 +86,10 @@ module MetaCC
       "xmsvc" =>    MsvcToolchain,
       "xgnu" =>     GnuToolchain,
       "xclang" =>   ClangToolchain,
-      "xclangcl" => ClangClToolchain
+      "xclangcl" => ClangclToolchain
     }.freeze
 
-    def run(argv, driver: build_driver)
+    def run(argv, driver: Driver.new)
       argv = argv.dup
       subcommand = argv.shift
 
@@ -125,10 +125,6 @@ module MetaCC
     end
 
     private
-
-    def build_driver
-      Driver.new
-    end
 
     def setup_compile_options(parser, options, standards)
       parser.on("-o FILEPATH", "Output file path") do |value|

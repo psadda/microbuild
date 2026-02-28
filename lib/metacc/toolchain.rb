@@ -314,7 +314,7 @@ module MetaCC
 
   # clang-cl toolchain – uses clang-cl compiler with MSVC-compatible flags and
   # environment setup.
-  class ClangClToolchain < MsvcToolchain
+  class ClangclToolchain < MsvcToolchain
 
     def initialize(search_paths: [])
       super("clang-cl", search_paths:)

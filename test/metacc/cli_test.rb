@@ -160,7 +160,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xclangcl", "/Ot", "main.c"])
 
-    assert_equal ["/Ot"], options[:xflags][MetaCC::ClangClToolchain]
+    assert_equal ["/Ot"], options[:xflags][MetaCC::ClangclToolchain]
   end
 
   def test_parse_compile_args_mixed_xflags
@@ -448,7 +448,7 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   # run – compile/link subcommands dispatch to driver with correct arguments
   #
-  # Uses a TestCLI subclass that overrides build_driver to return a StubDriver.
+  # Uses a TestCLI subclass that overrides run to inject a StubDriver.
   # The StubDriver overrides only the Driver methods that call subprocesses,
   # recording their arguments so tests can assert on observable postconditions
   # without triggering real compiler invocations.
@@ -484,10 +484,9 @@ class CLITest < Minitest::Test
 
     attr_reader :stub_driver
 
-    private
-
-    def build_driver
+    def run(argv, driver: nil)
       @stub_driver = StubDriver.new
+      super(argv, driver: @stub_driver)
     end
 
   end
