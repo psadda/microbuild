@@ -97,7 +97,9 @@ class MsvcToolchainTest < Minitest::Test
   # super arity issue in MsvcToolchain#initialize.
   def msvc_for_vcvarsall_command
     Class.new(MetaCC::MsvcToolchain) do
-      def initialize; end
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
     end.new
   end
 
@@ -221,12 +223,6 @@ class ClangClToolchainTest < Minitest::Test
   # Constructor postconditions
   # ---------------------------------------------------------------------------
 
-  def test_type_is_clang_cl
-    tc = stub_clang_cl_class(clang_cl_on_path: true).new
-
-    assert_equal :clang_cl, tc.type
-  end
-
   def test_compiler_commands_are_clang_cl
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
@@ -250,10 +246,10 @@ class ClangClToolchainTest < Minitest::Test
   # Flags: inherits MSVC-compatible flags
   # ---------------------------------------------------------------------------
 
-  def test_flags_returns_msvc_flags
+  def test_flags_returns_clang_cl_flags
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
-    assert_equal MetaCC::MsvcToolchain::MSVC_FLAGS, tc.flags
+    assert_equal MetaCC::ClangClToolchain::CLANG_CL_FLAGS, tc.flags
   end
 
   # ---------------------------------------------------------------------------
@@ -356,11 +352,9 @@ class MsvcToolchainCommandTest < Minitest::Test
   # following the same pattern as msvc_for_vcvarsall_command in MsvcToolchainTest.
   def msvc
     Class.new(MetaCC::MsvcToolchain) do
-      def initialize
-        @type = :msvc
-        @c    = "cl"
-        @cxx  = "cl"
-      end
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
     end.new
   end
 

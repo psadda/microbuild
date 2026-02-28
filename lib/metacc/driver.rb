@@ -12,9 +12,6 @@ module MetaCC
   # available compiler found on the system (Clang, GCC, or MSVC).
   class Driver
 
-    # Ordered list of toolchain classes to probe, in priority order.
-    TOOLCHAIN_CLASSES = [ClangToolchain, GnuToolchain, MsvcToolchain].freeze
-
     RECOGNIZED_FLAGS = Set.new(
       %i[
         o0 o1 o2 o3
@@ -41,20 +38,28 @@ module MetaCC
 
     # Detects the first available C/C++ compiler toolchain.
     #
-    # @param stdout_sink [#write, nil] optional object whose +write+ method is called
-    #                                 with each command's stdout after every invocation.
-    # @param stderr_sink [#write, nil] optional object whose +write+ method is called
-    #                                 with each command's stderr after every invocation.
-    #                                 The same object may be passed for both sinks.
-    # @param output_dir  [String] directory prepended to relative output file paths
-    #                            (default: "build"). Absolute output paths are used as-is.
+    # @param stdout_sink            [#write, nil] optional object whose +write+ method is called
+    #                                            with each command's stdout after every invocation.
+    # @param stderr_sink            [#write, nil] optional object whose +write+ method is called
+    #                                            with each command's stderr after every invocation.
+    #                                            The same object may be passed for both sinks.
+    # @param output_dir             [String] directory prepended to relative output file paths
+    #                                       (default: "build"). Absolute output paths are used as-is.
+    # @param prefer                 [Array<Class>] toolchain classes to probe, in priority order.
+    #                                             Each element must be a Class derived from Toolchain.
+    #                                             Defaults to [ClangToolchain, GnuToolchain, MsvcToolchain].
+    # @param toolchain_search_paths [Array<String>] directories to search for toolchain executables
+    #                                              before falling back to PATH. Defaults to [].
     # @raise [CompilerNotFoundError] if no supported compiler is found.
-    def initialize(stdout_sink: nil, stderr_sink: nil, output_dir: "build")
+    def initialize(stdout_sink: nil, stderr_sink: nil, output_dir: "build",
+                   prefer: [ClangToolchain, GnuToolchain, MsvcToolchain],
+                   toolchain_search_paths: [])
       @stdout_sink = stdout_sink
       @stderr_sink = stderr_sink
       @output_dir = output_dir
+      @toolchain_search_paths = toolchain_search_paths
       @log = []
-      @toolchain = detect_toolchain!
+      @toolchain = select_toolchain!(prefer)
     end
 
     # Invokes the compiler driver for the given input files and output path.
@@ -69,7 +74,7 @@ module MetaCC
     # @param input_files          [String, Array<String>] paths to the input files
     # @param output_path          [String] path for the resulting output file
     # @param flags                [Array<Symbol>] compiler/linker flags
-    # @param xflags               [Hash{Symbol => String}] extra (native) compiler flags
+    # @param xflags               [Hash{Class => String}] extra (native) compiler flags keyed by toolchain Class
     # @param include_paths        [Array<String>] directories to add with -I
     # @param definitions          [Array<String>] preprocessor macros (e.g. "FOO" or "FOO=1")
     # @param libs                 [Array<String>] library names to link (e.g. "m", "pthread")
@@ -93,7 +98,7 @@ module MetaCC
     )
       input_files = Array(input_files)
       flags = translate_flags(flags)
-      flags.concat(xflags[@toolchain.type] || [])
+      flags.concat(xflags[@toolchain.class] || [])
 
       out = resolve_output(output_path)
       return true if !force && up_to_date?(out, input_files)
@@ -104,9 +109,9 @@ module MetaCC
 
     private
 
-    def detect_toolchain!
-      toolchain_classes.each do |klass|
-        tc = klass.new
+    def select_toolchain!(prefer)
+      prefer.each do |klass|
+        tc = klass.new(search_paths: @toolchain_search_paths)
         return tc if tc.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
@@ -119,10 +124,6 @@ module MetaCC
       end
 
       flags.flat_map { |flag| @toolchain.flags[flag] }
-    end
-
-    def toolchain_classes
-      TOOLCHAIN_CLASSES
     end
 
     def run_command(cmd, env: {}, working_dir: ".")

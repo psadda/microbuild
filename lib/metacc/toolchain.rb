@@ -8,12 +8,15 @@ module MetaCC
   # Subclasses set their own command attributes in +initialize+ by calling
   # +command_available?+ to probe the system, then implement the
   # toolchain-specific flag and command building methods.
-  #   type – symbolic name (:clang, :gcc, :msvc)
   #   c    – command used to compile C source files
   #   cxx  – command used to compile C++ source files
   class Toolchain
 
-    attr_reader :type, :c, :cxx
+    attr_reader :c, :cxx
+
+    def initialize(search_paths: [])
+      @search_paths = search_paths
+    end
 
     # Returns true if this toolchain's primary compiler is present in PATH.
     def available?
@@ -56,16 +59,26 @@ module MetaCC
       File.extname(path).downcase == ".c"
     end
 
+    # Returns the full path to +name+ if it is found (and executable) in one of
+    # the configured search paths, otherwise returns +name+ unchanged so that
+    # the shell's PATH is used at execution time.
+    def resolve_command(name)
+      @search_paths.each do |dir|
+        full_path = File.join(dir, name)
+        return full_path if File.executable?(full_path)
+      end
+      name
+    end
+
   end
 
   # GNU-compatible toolchain (gcc).
   class GnuToolchain < Toolchain
 
-    def initialize
+    def initialize(search_paths: [])
       super
-      @type = :gcc
-      @c    = "gcc"
-      @cxx  = "g++"
+      @c    = resolve_command("gcc")
+      @cxx  = resolve_command("g++")
     end
 
     def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
@@ -122,11 +135,10 @@ module MetaCC
   # Clang toolchain – identical command structure to GNU.
   class ClangToolchain < GnuToolchain
 
-    def initialize
+    def initialize(search_paths: [])
       super
-      @type = :clang
-      @c    = "clang"
-      @cxx  = "clang++"
+      @c    = resolve_command("clang")
+      @cxx  = resolve_command("clang++")
     end
 
     CLANG_FLAGS = GNU_FLAGS.merge(lto: ["-flto=thin"]).freeze
@@ -146,12 +158,12 @@ module MetaCC
       "Microsoft Visual Studio", "Installer", "vswhere.exe"
     ).freeze
 
-    def initialize(cl_command = "cl")
-      super
-      @type = :msvc
-      @c    = cl_command
-      @cxx  = cl_command
-      setup_msvc_environment(cl_command)
+    def initialize(cl_command = "cl", search_paths: [])
+      super(search_paths:)
+      resolved_cmd = resolve_command(cl_command)
+      @c    = resolved_cmd
+      @cxx  = resolved_cmd
+      setup_msvc_environment(resolved_cmd)
     end
 
     def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
@@ -301,9 +313,8 @@ module MetaCC
   # environment setup.
   class ClangClToolchain < MsvcToolchain
 
-    def initialize
-      super("clang-cl")
-      @type = :clang_cl
+    def initialize(search_paths: [])
+      super("clang-cl", search_paths:)
     end
 
     CLANG_CL_FLAGS = MSVC_FLAGS.merge(

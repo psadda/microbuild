@@ -15,10 +15,10 @@ class DriverTest < Minitest::Test
     assert_instance_of MetaCC::Driver, MetaCC::Driver.new
   end
 
-  def test_compiler_type_is_known
+  def test_compiler_class_is_known
     builder = MetaCC::Driver.new
 
-    assert_includes %i[clang gcc msvc], builder.toolchain.type
+    assert_includes [MetaCC::ClangToolchain, MetaCC::GnuToolchain, MetaCC::MsvcToolchain], builder.toolchain.class
   end
 
   def test_compiler_is_compiler_info_struct
@@ -28,15 +28,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_raises_when_no_compiler_found
-    # Use an anonymous subclass with no toolchain classes to probe.
-    klass = Class.new(MetaCC::Driver) do
-      private
-
-      def toolchain_classes
-        []
-      end
-    end
-    assert_raises(MetaCC::CompilerNotFoundError) { klass.new }
+    assert_raises(MetaCC::CompilerNotFoundError) { MetaCC::Driver.new(prefer: []) }
   end
 
   # ---------------------------------------------------------------------------
@@ -242,7 +234,7 @@ class DriverTest < Minitest::Test
   # ---------------------------------------------------------------------------
   def test_invoke_shared_creates_shared_library
     builder = MetaCC::Driver.new
-    skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
+    skip("MSVC shared linking not tested here") if builder.toolchain.is_a?(MetaCC::MsvcToolchain)
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -349,7 +341,7 @@ class DriverTest < Minitest::Test
 
   def test_invoke_shared_skips_when_output_is_up_to_date
     builder = MetaCC::Driver.new
-    skip("MSVC shared linking not tested here") if builder.toolchain.type == :msvc
+    skip("MSVC shared linking not tested here") if builder.toolchain.is_a?(MetaCC::MsvcToolchain)
 
     Dir.mktmpdir do |dir|
       src = File.join(dir, "util.c")
@@ -466,6 +458,69 @@ class DriverTest < Minitest::Test
 
       assert result, "expected invoke to succeed with working_dir set"
       assert_path_exists obj, "object file should exist after invoke with working_dir"
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # prefer: constructor option
+  # ---------------------------------------------------------------------------
+  def test_prefer_selects_specified_toolchain_class
+    builder = MetaCC::Driver.new(prefer: [MetaCC::GnuToolchain])
+
+    assert_instance_of MetaCC::GnuToolchain, builder.toolchain
+  end
+
+  def test_prefer_empty_raises_compiler_not_found
+    assert_raises(MetaCC::CompilerNotFoundError) { MetaCC::Driver.new(prefer: []) }
+  end
+
+  def test_prefer_default_is_clang_gnu_msvc_order
+    builder = MetaCC::Driver.new
+
+    assert_includes [MetaCC::ClangToolchain, MetaCC::GnuToolchain, MetaCC::MsvcToolchain],
+                    builder.toolchain.class
+  end
+
+  # ---------------------------------------------------------------------------
+  # toolchain_search_paths: constructor option
+  # ---------------------------------------------------------------------------
+  def test_toolchain_search_paths_default_is_empty
+    # Verify the driver initializes without error when search_paths is empty.
+    builder = MetaCC::Driver.new(toolchain_search_paths: [])
+
+    assert_instance_of MetaCC::Driver, builder
+  end
+
+  def test_toolchain_search_paths_finds_compiler_in_custom_dir
+    Dir.mktmpdir do |dir|
+      # Create a fake gcc script in a custom directory.
+      fake_gcc = File.join(dir, "gcc")
+      File.write(fake_gcc, "#!/bin/sh\nexec gcc \"$@\"\n")
+      File.chmod(0o755, fake_gcc)
+
+      builder = MetaCC::Driver.new(
+        prefer: [MetaCC::GnuToolchain],
+        toolchain_search_paths: [dir]
+      )
+
+      assert_equal fake_gcc, builder.toolchain.c
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # xflags: Class-keyed extra flags
+  # ---------------------------------------------------------------------------
+  def test_xflags_with_class_key_is_applied_for_active_toolchain
+    builder = MetaCC::Driver.new
+    tc_class = builder.toolchain.class
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.invoke(src, obj, flags: [:objects], xflags: { tc_class => [] })
+
+      assert result, "expected invoke with class-keyed xflags to succeed"
     end
   end
 

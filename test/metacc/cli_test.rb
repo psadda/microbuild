@@ -132,35 +132,35 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xmsvc", "Z7", "main.c"])
 
-    assert_equal ["Z7"], options[:xflags][:msvc]
+    assert_equal ["Z7"], options[:xflags][MetaCC::MsvcToolchain]
   end
 
   def test_parse_compile_args_xmsvc_multiple_values
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xmsvc", "Z7", "--xmsvc", "/EHc", "main.c"])
 
-    assert_equal ["Z7", "/EHc"], options[:xflags][:msvc]
+    assert_equal ["Z7", "/EHc"], options[:xflags][MetaCC::MsvcToolchain]
   end
 
   def test_parse_compile_args_xgnu_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xgnu", "-march=skylake", "main.c"])
 
-    assert_equal ["-march=skylake"], options[:xflags][:gcc]
+    assert_equal ["-march=skylake"], options[:xflags][MetaCC::GnuToolchain]
   end
 
   def test_parse_compile_args_xclang_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--xclang", "-fcolor-diagnostics", "main.c"])
 
-    assert_equal ["-fcolor-diagnostics"], options[:xflags][:clang]
+    assert_equal ["-fcolor-diagnostics"], options[:xflags][MetaCC::ClangToolchain]
   end
 
   def test_parse_compile_args_xclang_cl_flag
     cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--xclang_cl", "/Ot", "main.c"])
+    options, _sources = cli.parse_compile_args(["--xclangcl", "/Ot", "main.c"])
 
-    assert_equal ["/Ot"], options[:xflags][:clang_cl]
+    assert_equal ["/Ot"], options[:xflags][MetaCC::ClangClToolchain]
   end
 
   def test_parse_compile_args_mixed_xflags
@@ -169,8 +169,8 @@ class CLITest < Minitest::Test
       ["--xmsvc", "Z7", "--xgnu", "-funroll-loops", "--xmsvc", "/EHc", "main.c"]
     )
 
-    assert_equal ["Z7", "/EHc"], options[:xflags][:msvc]
-    assert_equal ["-funroll-loops"], options[:xflags][:gcc]
+    assert_equal ["Z7", "/EHc"], options[:xflags][MetaCC::MsvcToolchain]
+    assert_equal ["-funroll-loops"], options[:xflags][MetaCC::GnuToolchain]
   end
 
   # ---------------------------------------------------------------------------
@@ -457,7 +457,7 @@ class CLITest < Minitest::Test
   # A stub that records Driver#invoke calls without running subprocesses.
   class StubDriver
 
-    StubToolchain = Struct.new(:type) do
+    class StubToolchain < MetaCC::Toolchain
       def show_version = "stubbed compiler 1.0.0\n"
     end
 
@@ -465,7 +465,7 @@ class CLITest < Minitest::Test
 
     def initialize
       @calls = []
-      @toolchain = StubToolchain.new(:clang)
+      @toolchain = StubToolchain.new
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],
@@ -577,7 +577,7 @@ class CLITest < Minitest::Test
 
     xflags = cli.stub_driver.calls.first[:xflags]
 
-    assert_equal ["Z7", "/EHc"], xflags[:msvc]
+    assert_equal ["Z7", "/EHc"], xflags[MetaCC::MsvcToolchain]
   end
 
   def test_run_compile_forwards_libs_and_linker_include_dirs

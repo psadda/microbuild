@@ -33,10 +33,10 @@ module MetaCC
   #   --no-rtti --no-exceptions --pic
   #
   # Toolchain-specific flags (passed to Driver#compile via xflags:):
-  #   --xmsvc VALUE     – appended to xflags[:msvc]
-  #   --xgnu  VALUE     – appended to xflags[:gcc]
-  #   --xclang VALUE    – appended to xflags[:clang]
-  #   --xclangcl VALUE  – appended to xflags[:clang_cl]
+  #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
+  #   --xgnu  VALUE     – appended to xflags[GnuToolchain]
+  #   --xclang VALUE    – appended to xflags[ClangToolchain]
+  #   --xclangcl VALUE  – appended to xflags[ClangClToolchain]
   class CLI
 
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
@@ -79,12 +79,12 @@ module MetaCC
       "c++26"    => :cxx26
     }.freeze
 
-    # Maps --x<name> CLI option names to xflags toolchain-type keys.
+    # Maps --x<name> CLI option names to xflags toolchain-class keys.
     XFLAGS = {
-      "xmsvc"    => :msvc,
-      "xgnu"     => :gcc,
-      "xclang"   => :clang,
-      "xclangcl" => :clang_cl
+      "xmsvc"    => MsvcToolchain,
+      "xgnu"     => GnuToolchain,
+      "xclang"   => ClangToolchain,
+      "xclangcl" => ClangClToolchain
     }.freeze
 
     def self.run(argv = ARGV)
@@ -164,10 +164,10 @@ module MetaCC
       parser.on("-W OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
       parser.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
       LONG_FLAGS.each { |name, sym| parser.on("--#{name}") { options[:flags] << sym } }
-      XFLAGS.each do |name, tc_sym|
-        parser.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_sym} toolchain") do |v|
-          options[:xflags][tc_sym] ||= []
-          options[:xflags][tc_sym] << v
+      XFLAGS.each do |name, tc_class|
+        parser.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_class} toolchain") do |v|
+          options[:xflags][tc_class] ||= []
+          options[:xflags][tc_class] << v
         end
       end
     end
