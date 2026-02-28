@@ -26,8 +26,8 @@ module MetaCC
   #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native
   #   --debug / -g --lto
   #   -Wall -Werror
-  #   --std=c11 --std=c17 --std=c23
-  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26
+  #   --std=c11 --std=c17 --std=c23                                             (c only)
+  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26  (cxx only)
   #   --asan --ubsan --msan
   #   --no-rtti --no-exceptions --pic
   #
@@ -63,10 +63,13 @@ module MetaCC
       "native"   => :native
     }.freeze
 
-    STANDARDS = {
+    C_STANDARDS = {
       "c11"      => :c11,
       "c17"      => :c17,
-      "c23"      => :c23,
+      "c23"      => :c23
+    }.freeze
+
+    CXX_STANDARDS = {
       "c++11"    => :cxx11,
       "c++14"    => :cxx14,
       "c++17"    => :cxx17,
@@ -93,7 +96,7 @@ module MetaCC
 
       case subcommand
       when "c", "cxx"
-        options, sources = parse_compile_args(argv)
+        options, sources = parse_compile_args(argv, subcommand)
         driver = build_driver
         compile_sources(driver, sources, options)
       when "link"
@@ -108,12 +111,13 @@ module MetaCC
 
     # Parses compile subcommand arguments.
     # Returns [options_hash, remaining_positional_args].
-    def parse_compile_args(argv)
+    def parse_compile_args(argv, subcommand = "c")
       options = { includes: [], defines: [], output: nil, flags: [], xflags: {},
                   libs: [], linker_include_dirs: [] }
+      standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
       setup_link_options(parser, options)
-      setup_compile_options(parser, options)
+      setup_compile_options(parser, options, standards)
       sources = parser.permute(argv)
       [options, sources]
     end
@@ -145,13 +149,13 @@ module MetaCC
     end
 
     # Registers compile-only options (include paths, defines, code-gen flags, etc.).
-    def setup_compile_options(parser, options)
+    def setup_compile_options(parser, options, standards)
       parser.on("-I DIRPATH", "Add an include search directory") { |v| options[:includes] << v }
       parser.on("-D DEF", "Add a preprocessor definition") { |v| options[:defines] << v }
       parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") { |l| options[:flags] << :"o#{l}" }
       parser.on("-m", "--arch ARCH", "Target architecture") { |v| options[:flags] << TARGETS[v] }
       parser.on("-g", "--debug", "Emit debugging symbols") { options[:flags] << :debug }
-      parser.on("--std STANDARD", "Specify the language standard") { |v| options[:flags] << STANDARDS[v] }
+      parser.on("--std STANDARD", "Specify the language standard") { |v| options[:flags] << standards[v] }
       parser.on("-W OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
       parser.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
       LONG_FLAGS.each { |name, sym| parser.on("--#{name}") { options[:flags] << sym } }

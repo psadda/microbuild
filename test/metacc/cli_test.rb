@@ -232,8 +232,76 @@ class CLITest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # parse_compile_args – lib and libdir flags (shared with link)
+  # parse_compile_args – --std option (C standards for c, C++ standards for cxx)
   # ---------------------------------------------------------------------------
+  def test_parse_compile_args_c_standard_c11
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c11", "main.c"], "c")
+
+    assert_includes options[:flags], :c11
+  end
+
+  def test_parse_compile_args_c_standard_c17
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c17", "main.c"], "c")
+
+    assert_includes options[:flags], :c17
+  end
+
+  def test_parse_compile_args_c_standard_c23
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c23", "main.c"], "c")
+
+    assert_includes options[:flags], :c23
+  end
+
+  def test_parse_compile_args_cxx_standard_cxx17
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c++17", "main.cpp"], "cxx")
+
+    assert_includes options[:flags], :cxx17
+  end
+
+  def test_parse_compile_args_cxx_standard_cxx20
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c++20", "main.cpp"], "cxx")
+
+    assert_includes options[:flags], :cxx20
+  end
+
+  def test_parse_compile_args_all_c_standards
+    cli = MetaCC::CLI.new
+    MetaCC::CLI::C_STANDARDS.each do |name, sym|
+      options, _sources = cli.parse_compile_args(["--std", name, "main.c"], "c")
+
+      assert_includes options[:flags], sym, "--std #{name} should produce :#{sym} for c"
+    end
+  end
+
+  def test_parse_compile_args_all_cxx_standards
+    cli = MetaCC::CLI.new
+    MetaCC::CLI::CXX_STANDARDS.each do |name, sym|
+      options, _sources = cli.parse_compile_args(["--std", name, "main.cpp"], "cxx")
+
+      assert_includes options[:flags], sym, "--std #{name} should produce :#{sym} for cxx"
+    end
+  end
+
+  def test_parse_compile_args_c_rejects_cxx_standard
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c++17", "main.c"], "c")
+
+    refute_includes options[:flags], :cxx17
+  end
+
+  def test_parse_compile_args_cxx_rejects_c_standard
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--std", "c11", "main.cpp"], "cxx")
+
+    refute_includes options[:flags], :c11
+  end
+
+
   def test_parse_compile_args_lib_short_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-l", "m", "main.c"])
