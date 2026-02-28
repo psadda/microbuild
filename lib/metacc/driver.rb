@@ -39,8 +39,7 @@ module MetaCC
     # @raise [CompilerNotFoundError] if no supported compiler is found.
     def initialize(prefer: [ClangToolchain, GnuToolchain, MsvcToolchain],
                    search_paths: [])
-      @search_paths = search_paths
-      @toolchain = select_toolchain!(prefer)
+      @toolchain = select_toolchain!(prefer, search_paths)
     end
 
     # Invokes the compiler driver for the given input files and output path.
@@ -81,10 +80,10 @@ module MetaCC
 
     private
 
-    def select_toolchain!(prefer)
-      prefer.each do |klass|
-        tc = klass.new(search_paths: @search_paths)
-        return tc if tc.available?
+    def select_toolchain!(candidates, search_paths)
+      candidates.each do |toolchain_class|
+        toolchain = toolchain_class.new(search_paths:)
+        return toolchain if toolchain.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
     end
