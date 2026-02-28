@@ -99,11 +99,12 @@ module MetaCC
 
       case subcommand
       when "c", "cxx"
-        options, sources = parse_compile_args(argv, subcommand)
+        options, input_paths = parse_compile_args(argv, subcommand)
+        output_path = options.delete(:output_path)
         driver = build_driver
-        compile_sources(driver, sources, options)
+        invoke(driver, input_paths, output_path, options)
       else
-        warn "Usage: metacc <c|cxx|link> [options] <files...>"
+        warn "Usage: metacc <c|cxx> [options] <files...>"
         exit 1
       end
     end
@@ -189,15 +190,9 @@ module MetaCC
       end
     end
 
-    def compile_sources(driver, sources, options)
-      sources.each do |source|
-        success = driver.invoke(
-          source,
-          options.delete(:output_path),
-          **options
-        )
-        exit 1 unless success
-      end
+    def invoke(driver, input_paths, output_path, options)
+      success = driver.invoke(sources, output_path, **options)
+      exit 1 unless success
     end
 
   end
