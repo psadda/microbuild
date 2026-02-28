@@ -420,13 +420,8 @@ class CLITest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # run – unknown subcommand exits
+  # run – exits when no input files are provided
   # ---------------------------------------------------------------------------
-  def test_run_unknown_subcommand_exits
-    cli = MetaCC::CLI.new
-    assert_raises(SystemExit) { cli.run(["unknown"]) }
-  end
-
   def test_run_no_subcommand_exits
     cli = MetaCC::CLI.new
     assert_raises(SystemExit) { cli.run([]) }
@@ -471,9 +466,9 @@ class CLITest < Minitest::Test
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
-               libs: [], linker_paths: [], language: :c, **)
+               libs: [], linker_paths: [], **)
       @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, defs:, libs:, linker_paths:, language: }
+                  include_paths:, defs:, libs:, linker_paths: }
       true
     end
 
@@ -493,7 +488,7 @@ class CLITest < Minitest::Test
 
   def test_run_c_dispatches_invoke_with_output
     cli = TestCLI.new
-    cli.run(["c", "-o", "main.o", "main.c"])
+    cli.run(["-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
 
@@ -503,31 +498,9 @@ class CLITest < Minitest::Test
     assert_includes call[:flags], :objects
   end
 
-  def test_run_c_passes_language_c
-    cli = TestCLI.new
-    cli.run(["c", "-o", "main.o", "main.c"])
-
-    assert_equal :c, cli.stub_driver.calls.first[:language]
-  end
-
-  def test_run_cxx_passes_language_cxx
-    cli = TestCLI.new
-    cli.run(["cxx", "-o", "hello.o", "hello.cpp"])
-
-    assert_equal :cxx, cli.stub_driver.calls.first[:language]
-  end
-
-  def test_run_cxx_dispatches_invoke
-    cli = TestCLI.new
-    cli.run(["cxx", "-o", "hello.o", "hello.cpp"])
-
-    assert_equal :invoke,     cli.stub_driver.calls.first[:method]
-    assert_equal "hello.cpp", cli.stub_driver.calls.first[:input_files].first
-  end
-
   def test_run_compile_forwards_flags
     cli = TestCLI.new
-    cli.run(["c", "-O2", "--avx", "--debug", "-o", "main.o", "main.c"])
+    cli.run(["-O2", "--avx", "--debug", "-o", "main.o", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
 
@@ -539,14 +512,14 @@ class CLITest < Minitest::Test
 
   def test_run_compile_defaults_to_objects_when_no_type_flag
     cli = TestCLI.new
-    cli.run(["c", "-o", "main.o", "main.c"])
+    cli.run(["-o", "main.o", "main.c"])
 
     assert_includes cli.stub_driver.calls.first[:flags], :objects
   end
 
   def test_run_compile_shared_flag
     cli = TestCLI.new
-    cli.run(["c", "--shared", "-o", "lib.so", "main.c"])
+    cli.run(["--shared", "-o", "lib.so", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
 
@@ -556,7 +529,7 @@ class CLITest < Minitest::Test
 
   def test_run_compile_static_flag
     cli = TestCLI.new
-    cli.run(["c", "--static", "-o", "lib.a", "main.c"])
+    cli.run(["--static", "-o", "lib.a", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
 
@@ -566,21 +539,21 @@ class CLITest < Minitest::Test
 
   def test_run_compile_objects_long_flag
     cli = TestCLI.new
-    cli.run(["c", "--objects", "-o", "main.o", "main.c"])
+    cli.run(["--objects", "-o", "main.o", "main.c"])
 
     assert_includes cli.stub_driver.calls.first[:flags], :objects
   end
 
   def test_run_compile_objects_short_flag
     cli = TestCLI.new
-    cli.run(["c", "-c", "-o", "main.o", "main.c"])
+    cli.run(["-c", "-o", "main.o", "main.c"])
 
     assert_includes cli.stub_driver.calls.first[:flags], :objects
   end
 
   def test_run_compile_forwards_includes_and_defines
     cli = TestCLI.new
-    cli.run(["c", "-I", "/inc", "-D", "FOO=1", "-o", "main.o", "main.c"])
+    cli.run(["-I", "/inc", "-D", "FOO=1", "-o", "main.o", "main.c"])
 
     call = cli.stub_driver.calls.first
 
@@ -590,7 +563,7 @@ class CLITest < Minitest::Test
 
   def test_run_compile_forwards_xflags
     cli = TestCLI.new
-    cli.run(["c", "--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "main.o", "main.c"])
+    cli.run(["--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "main.o", "main.c"])
 
     xflags = cli.stub_driver.calls.first[:xflags]
 
@@ -599,7 +572,7 @@ class CLITest < Minitest::Test
 
   def test_run_compile_forwards_libs_and_linker_include_dirs
     cli = TestCLI.new
-    cli.run(["c", "--shared", "-o", "lib.so", "-l", "m", "-L", "/opt/lib", "main.c"])
+    cli.run(["--shared", "-o", "lib.so", "-l", "m", "-L", "/opt/lib", "main.c"])
 
     call = cli.stub_driver.calls.first
 
@@ -609,48 +582,9 @@ class CLITest < Minitest::Test
 
   def test_run_compile_default_output_path
     cli = TestCLI.new
-    cli.run(["c", "src/main.c"])
+    cli.run(["src/main.c"])
 
     assert_equal "src/main.o", cli.stub_driver.calls.first[:output]
-  end
-
-  def test_run_link_executable_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "-o", "myapp", "a.o", "b.o"])
-
-    call = cli.stub_driver.calls.first
-
-    assert_equal :invoke,        call[:method]
-    assert_equal ["a.o", "b.o"], call[:input_files]
-    assert_equal "myapp",        call[:output]
-    refute_includes call[:flags], :static
-    refute_includes call[:flags], :shared
-  end
-
-  def test_run_link_static_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "--static", "-o", "lib.a", "a.o"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :static
-  end
-
-  def test_run_link_shared_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "--shared", "-o", "lib.so", "a.o"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :shared
-  end
-
-  def test_run_link_forwards_libs_and_linker_include_dirs
-    cli = TestCLI.new
-    cli.run(["link", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
-
-    call = cli.stub_driver.calls.first
-
-    assert_equal %w[m pthread], call[:libs]
-    assert_equal ["/opt/lib"], call[:linker_paths]
   end
 
 end

@@ -7,14 +7,13 @@ module MetaCC
 
   # Command-line interface for the MetaCC Driver.
   #
-  # Subcommands:
-  #   c   <sources...> -o <output> [options]       – compile C source file(s)
-  #   cxx <sources...> -o <output> [options]       – compile C++ source file(s)
+  # Usage:
+  #   metacc [options] <files...>
+  #   metacc --version
   #
   # General:
   #   -Wall -Werror
-  #   --std=c11 --std=c17 --std=c23                                             (c only)
-  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26  (cxx only)
+  #   --std=c11 --std=c17 --std=c23
   #
   # Linking:
   #   --objects / -c     – compile only; don't link
@@ -25,8 +24,8 @@ module MetaCC
   #   --strip / -s       – strip unneeded symbols
   #
   # Code generation:
-  #   -O0, -O1, -O2, -O3                             - Set the optimization level
-  #   -msse4.2 -mavx -mavx2 -mavx512 --arch=native   - Compile for the given target
+  #   -O0, -O1, -O2, -O3                           - Set the optimization level
+  #   --sse4.2 --avx --avx2 --avx512 --native       - Compile for the given target
   #   --no-rtti --no-exceptions
   #   --pic
   #
@@ -34,7 +33,7 @@ module MetaCC
   #   --debug / -g
   #   --asan --ubsan --msan
   #
-  # Toolchain-specific flags (passed to Driver#compile via xflags:):
+  # Toolchain-specific flags (passed to Driver#invoke via xflags:):
   #   --xmsvc VALUE     – appended to xflags[MsvcToolchain]
   #   --xgnu  VALUE     – appended to xflags[GnuToolchain]
   #   --xclang VALUE    – appended to xflags[ClangToolchain]
@@ -56,7 +55,7 @@ module MetaCC
     WARNING_CONFIGS = {
       "all" =>   :warn_all,
       "error" => :warn_error
-    }
+    }.freeze
 
     TARGETS = {
       "sse4.2" => :sse4_2,
@@ -91,65 +90,91 @@ module MetaCC
 
     def run(argv, driver: Driver.new)
       argv = argv.dup
-      subcommand = argv.shift
-
-      case subcommand
-      when "c", "cxx"
-        options, input_paths = parse_compile_args(argv, subcommand)
-        output_path = options.delete(:output_path)
-        language = subcommand == "cxx" ? :cxx : :c
-        invoke(driver, input_paths, output_path, options, language:)
-      else
-        warn "Usage: metacc <c|cxx> [options] <files...>"
+      if argv.delete("--version")
+        puts driver.toolchain.show_version
+        return
+      end
+      options, input_paths = parse_compile_args(argv)
+      if input_paths.empty?
+        warn "Usage: metacc [options] <files...>"
         exit 1
       end
+      output_path = options.delete(:output)
+      if output_path.nil? && input_paths.length == 1
+        output_path = input_paths.first.sub(/\.[^.]+$/, ".o")
+      end
+      unless options[:flags].any? { |f| %i[shared static objects].include?(f) }
+        options[:flags] << :objects
+      end
+      invoke(driver, input_paths, output_path, options)
     end
 
-    # Parses compile subcommand arguments.
+    # Parses compile arguments.
+    # +standard_set+ selects the language-standard set: "cxx" uses CXX_STANDARDS,
+    # anything else uses C_STANDARDS.
     # Returns [options_hash, remaining_positional_args].
-    def parse_compile_args(argv, subcommand = "c")
+    def parse_compile_args(argv, standard_set = "c")
       options = {
-        include_paths: [],
-        defs: [],
+        includes: [],
+        defines: [],
         linker_paths: [],
         libs: [],
-        output_path: nil,
+        output: nil,
         flags: [],
         xflags: {},
       }
-      standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
+      standards = standard_set == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
       setup_compile_options(parser, options, standards)
       sources = parser.permute(argv)
       [options, sources]
     end
 
+    # Parses link-step arguments.
+    # Returns [options_hash, remaining_positional_args (object files)].
+    def parse_link_args(argv)
+      options = {
+        output: nil,
+        flags: [],
+        libs: [],
+        linker_paths: [],
+      }
+      parser = OptionParser.new
+      setup_link_options(parser, options)
+      objects = parser.permute(argv)
+      [options, objects]
+    end
+
     private
 
     def setup_compile_options(parser, options, standards)
       parser.on("-o FILEPATH", "Output file path") do |value|
-        options[:output_path] = value
+        options[:output] = value
       end
       parser.on("-I DIRPATH", "Add an include search directory") do |value|
-        options[:include_paths] << value
+        options[:includes] << value
       end
       parser.on("-D DEF", "Add a preprocessor definition") do |value|
-        options[:defs] << value
+        options[:defines] << value
       end
       parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
-        options[:flags] << :"o#{l}"
+        options[:flags] << :"o#{level}"
       end
-      parser.on("-m", "--arch ARCH", "Target architecture") do |value|
-        options[:flags] << TARGETS[v]
+      TARGETS.each do |name, sym|
+        parser.on("--#{name}") do
+          options[:flags] << sym
+        end
       end
       parser.on("-g", "--debug", "Emit debugging symbols") do
         options[:flags] << :debug
       end
       parser.on("--std STANDARD", "Specify the language standard") do |value|
-        options[:flags] << standards[v]
+        flag = standards[value]
+        options[:flags] << flag if flag
       end
       parser.on("-W OPTION", "Configure warnings") do |value|
-        options[:flags] << WARNING_CONFIGS[v]
+        flag = WARNING_CONFIGS[value]
+        options[:flags] << flag if flag
       end
       parser.on("-c", "--objects", "Produce object files") do
         options[:flags] << :objects
@@ -182,8 +207,38 @@ module MetaCC
       end
     end
 
-    def invoke(driver, input_paths, output_path, options, language: :c)
-      success = driver.invoke(input_paths, output_path, language:, **options)
+    def setup_link_options(parser, options)
+      parser.on("-o FILEPATH", "Output file path") do |value|
+        options[:output] = value
+      end
+      parser.on("--shared", "Produce a shared library") do
+        options[:flags] << :shared
+      end
+      parser.on("--static", "Produce a static library") do
+        options[:flags] << :static
+      end
+      parser.on("-s", "--strip", "Strip unneeded symbols") do
+        options[:flags] << :strip
+      end
+      parser.on("-l LIB", "Link against library LIB") do |value|
+        options[:libs] << value
+      end
+      parser.on("-L DIR", "Add linker library search path") do |value|
+        options[:linker_paths] << value
+      end
+    end
+
+    def invoke(driver, input_paths, output_path, options)
+      success = driver.invoke(
+        input_paths,
+        output_path,
+        flags:         options[:flags],
+        xflags:        options[:xflags],
+        include_paths: options[:includes],
+        defs:          options[:defines],
+        libs:          options[:libs],
+        linker_paths:  options[:linker_paths]
+      )
       exit 1 unless success
     end
 

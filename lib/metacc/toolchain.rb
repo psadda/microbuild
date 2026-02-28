@@ -6,11 +6,10 @@ module MetaCC
   # Subclasses set their own command attributes in +initialize+ by calling
   # +command_available?+ to probe the system, then implement the
   # toolchain-specific flag and command building methods.
-  #   c    – command used to compile C source files
-  #   cxx  – command used to compile C++ source files
+  #   c  – command used to compile C source files
   class Toolchain
 
-    attr_reader :c, :cxx
+    attr_reader :c
 
     def initialize(search_paths: [])
       @search_paths = search_paths
@@ -37,7 +36,7 @@ module MetaCC
     end
 
     # Returns the output of running the compiler with --version.
-    def version_banner
+    def show_version
       IO.popen([c, "--version", { err: :out }], &:read)
     end
 
@@ -49,9 +48,7 @@ module MetaCC
     # Returns the full command array for the given inputs, output, and flags.
     # The output mode (object files, shared library, static library, or
     # executable) is determined by the translated flags.
-    # +language+ selects which compiler executable to invoke: :c uses the C
-    # compiler and :cxx uses the C++ compiler.
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       raise RuntimeError, "#{self.class}#command not implemented"
     end
 
@@ -80,17 +77,15 @@ module MetaCC
     def initialize(search_paths: [])
       super
       @c    = resolve_command("gcc")
-      @cxx  = resolve_command("g++")
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
-      cc = language == :c ? c : cxx
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
       link_mode = !flags.include?("-c")
       lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
       lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
-      [cc, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
+      [c, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
     end
 
     GNU_FLAGS = {
@@ -140,7 +135,6 @@ module MetaCC
     def initialize(search_paths: [])
       super
       @c    = resolve_command("clang")
-      @cxx  = resolve_command("clang++")
     end
 
     CLANG_FLAGS = GNU_FLAGS.merge(lto: ["-flto=thin"]).freeze
@@ -164,11 +158,10 @@ module MetaCC
       super(search_paths:)
       resolved_cmd = resolve_command(cl_command)
       @c    = resolved_cmd
-      @cxx  = resolved_cmd
       setup_msvc_environment(resolved_cmd)
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map { |d| "/D#{d}" }
 
@@ -337,7 +330,6 @@ module MetaCC
     def initialize(search_paths: [])
       super
       @c   = resolve_command("tcc")
-      @cxx = nil
     end
 
     # TinyCC does not support C++.
@@ -345,7 +337,7 @@ module MetaCC
       [:c]
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
       link_mode = !flags.include?("-c")
