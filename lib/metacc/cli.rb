@@ -44,13 +44,16 @@ module MetaCC
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
     LONG_FLAGS = {
-      "lto" =>           :lto,
-      "asan" =>          :asan,
-      "ubsan" =>         :ubsan,
-      "msan" =>          :msan,
-      "no-rtti" =>       :no_rtti,
-      "no-exceptions" => :no_exceptions,
-      "pic" =>           :pic
+      "lto" =>                       :lto,
+      "asan" =>                      :asan,
+      "ubsan" =>                     :ubsan,
+      "msan" =>                      :msan,
+      "no-rtti" =>                   :no_rtti,
+      "no-exceptions" =>             :no_exceptions,
+      "pic" =>                       :pic,
+      "no-semantic-interposition" => :no_semantic_interposition,
+      "no-omit-frame-pointer" =>     :no_omit_frame_pointer,
+      "no-strict-aliasing" =>        :no_strict_aliasing
     }.freeze
 
     WARNING_CONFIGS = {
@@ -138,6 +141,9 @@ module MetaCC
       end
       parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
         options[:flags] << :"o#{l}"
+      end
+      parser.on("-Os", "Optimize for size") do
+        options[:flags] << :os
       end
       parser.on("-m", "--arch ARCH", "Target architecture") do |value|
         options[:flags] << TARGETS[v]

@@ -13,7 +13,7 @@ module MetaCC
 
     RECOGNIZED_FLAGS = Set.new(
       %i[
-        o0 o1 o2 o3
+        o0 o1 o2 o3 os
         sse4_2 avx avx2 avx512 native
         debug lto
         warn_all warn_error
@@ -21,6 +21,7 @@ module MetaCC
         cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
         asan ubsan msan
         no_rtti no_exceptions pic
+        no_semantic_interposition no_omit_frame_pointer no_strict_aliasing
         objects shared static strip
       ]
     ).freeze
