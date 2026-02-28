@@ -25,7 +25,7 @@ module MetaCC
         cxx11 cxx14 cxx17 cxx20 cxx23 cxx26
         asan ubsan msan
         no_rtti no_exceptions pic
-        objects shared static
+        objects shared static strip
       ]
     ).freeze
 

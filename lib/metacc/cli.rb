@@ -20,6 +20,7 @@ module MetaCC
   # Output type flags for link (default produces an executable):
   #   --shared           – produce a shared library
   #   --static           – produce a static library
+  #   --strip / -s       – strip unneeded symbols
   #
   # Recognised flags (passed to Driver#compile via flags:):
   #   -O0 -O1 -O2 -O3
@@ -144,6 +145,7 @@ module MetaCC
       parser.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
       parser.on("--shared", "Produce a shared library") { options[:flags] << :shared }
       parser.on("--static", "Produce a static library") { options[:flags] << :static }
+      parser.on("-s", "--strip", "Strip unneeded symbols") { options[:flags] << :strip }
       parser.on("-l LIB", "Link against library LIB") { |v| options[:libs] << v }
       parser.on("-L DIR", "Add linker library search path") { |v| options[:linker_include_dirs] << v }
     end

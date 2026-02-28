@@ -391,6 +391,34 @@ class CLITest < Minitest::Test
     assert_equal [], options[:linker_include_dirs]
   end
 
+  def test_parse_link_args_strip_long_flag
+    cli = MetaCC::CLI.new
+    options, _objects = cli.parse_link_args(["--strip", "main.o"])
+
+    assert_includes options[:flags], :strip
+  end
+
+  def test_parse_link_args_strip_short_flag
+    cli = MetaCC::CLI.new
+    options, _objects = cli.parse_link_args(["-s", "main.o"])
+
+    assert_includes options[:flags], :strip
+  end
+
+  def test_parse_compile_args_strip_long_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--strip", "main.c"])
+
+    assert_includes options[:flags], :strip
+  end
+
+  def test_parse_compile_args_strip_short_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["-s", "main.c"])
+
+    assert_includes options[:flags], :strip
+  end
+
   # ---------------------------------------------------------------------------
   # run – unknown subcommand exits
   # ---------------------------------------------------------------------------
