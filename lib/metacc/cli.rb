@@ -111,8 +111,15 @@ module MetaCC
     # Parses compile subcommand arguments.
     # Returns [options_hash, remaining_positional_args].
     def parse_compile_args(argv, subcommand = "c")
-      options = { includes: [], defines: [], output: nil, flags: [], xflags: {},
-                  libs: [], linker_paths: [] }
+      options = {
+        include_paths: [],
+        defs: [],
+        linker_paths: [],
+        libs: [],
+        output_path: nil,
+        flags: [],
+        xflags: {},
+      }
       standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
       setup_compile_options(parser, options, standards)
@@ -128,13 +135,13 @@ module MetaCC
 
     def setup_compile_options(parser, options, standards)
       parser.on("-o FILEPATH", "Output file path") do |value|
-        options[:output] = v
+        options[:output_path] = value
       end
       parser.on("-I DIRPATH", "Add an include search directory") do |value|
-        options[:includes] << value
+        options[:include_paths] << value
       end
       parser.on("-D DEF", "Add a preprocessor definition") do |value|
-        options[:defines] << value
+        options[:defs] << value
       end
       parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
         options[:flags] << :"o#{l}"
@@ -182,19 +189,12 @@ module MetaCC
       end
     end
 
-    OUTPUT_TYPE_FLAGS = %i[objects shared static].freeze
-
     def compile_sources(driver, sources, options)
       sources.each do |source|
         success = driver.invoke(
           source,
-          options[:output],
-          flags:         options[:flags],
-          xflags:        options[:xflags],
-          include_paths: options[:includes],
-          defs:          options[:defines],
-          libs:          options[:libs],
-          linker_paths:  options[:linker_paths]
+          options.delete(:output_path),
+          **options
         )
         exit 1 unless success
       end
