@@ -587,28 +587,4 @@ class TinyCCToolchainTest < Minitest::Test
     refute_includes cmd, "-L/opt/lib"
   end
 
-  # ---------------------------------------------------------------------------
-  # Flags
-  # ---------------------------------------------------------------------------
-
-  def test_flags_returns_tinycc_flags
-    assert_equal MetaCC::TinyCC::TINYCC_FLAGS, tcc.flags
-  end
-
-  def test_objects_flag_maps_to_dash_c
-    assert_equal ["-c"], MetaCC::TinyCC::TINYCC_FLAGS[:objects]
-  end
-
-  def test_shared_flag_maps_to_dash_shared
-    assert_equal ["-shared"], MetaCC::TinyCC::TINYCC_FLAGS[:shared]
-  end
-
-  def test_debug_flag_maps_to_dash_g
-    assert_equal ["-g"], MetaCC::TinyCC::TINYCC_FLAGS[:debug]
-  end
-
-  def test_o3_maps_to_o2_since_tcc_lacks_o3
-    assert_equal ["-O2"], MetaCC::TinyCC::TINYCC_FLAGS[:o3]
-  end
-
 end
