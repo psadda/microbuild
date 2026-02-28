@@ -246,6 +246,45 @@ class CLITest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
+  # parse_compile_args – lib and libdir flags (shared with link)
+  # ---------------------------------------------------------------------------
+  def test_parse_compile_args_lib_short_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["-l", "m", "main.c"])
+
+    assert_equal ["m"], options[:libs]
+  end
+
+  def test_parse_compile_args_lib_long_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--lib", "pthread", "main.c"])
+
+    assert_equal ["pthread"], options[:libs]
+  end
+
+  def test_parse_compile_args_libdir_short_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["-L", "/usr/local/lib", "main.c"])
+
+    assert_equal ["/usr/local/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_compile_args_libdir_long_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--libdir", "/opt/lib", "main.c"])
+
+    assert_equal ["/opt/lib"], options[:linker_include_dirs]
+  end
+
+  def test_parse_compile_args_libs_and_libdirs_default_to_empty
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["main.c"])
+
+    assert_equal [], options[:libs]
+    assert_equal [], options[:linker_include_dirs]
+  end
+
+  # ---------------------------------------------------------------------------
   # parse_link_args
   # ---------------------------------------------------------------------------
   def test_parse_link_args_default_produces_no_type_flags
@@ -467,6 +506,16 @@ class CLITest < Minitest::Test
     xflags = cli.stub_driver.calls.first[:xflags]
 
     assert_equal ["Z7", "/EHc"], xflags[:msvc]
+  end
+
+  def test_run_compile_forwards_libs_and_linker_include_dirs
+    cli = TestCLI.new
+    cli.run(["c", "--shared", "-o", "lib.so", "-l", "m", "-L", "/opt/lib", "main.c"])
+
+    call = cli.stub_driver.calls.first
+
+    assert_equal ["m"],        call[:libs]
+    assert_equal ["/opt/lib"], call[:linker_include_dirs]
   end
 
   def test_run_compile_default_output_path

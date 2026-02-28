@@ -109,50 +109,12 @@ module MetaCC
     # Parses compile subcommand arguments.
     # Returns [options_hash, remaining_positional_args].
     def parse_compile_args(argv)
-      options = { includes: [], defines: [], output: nil, flags: [], xflags: {} }
-
-      parser = OptionParser.new do |opts|
-        opts.on("-o FILEPATH", "Output file path") do |value|
-          options[:output] = value
-        end
-        opts.on("-I", "--include DIRPATH", "Add an include search directory") do |value|
-          options[:includes] << value
-        end
-        opts.on("-D", "--define DEF", "Add a preprocessor definition") do |value|
-          options[:defines] << value
-        end
-        opts.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") do |level|
-          options[:flags] << :"o#{level}"
-        end
-        opts.on("-m", "--arch ARCH", "Target architecture") do |value|
-          options[:flags] << TARGETS[value]
-        end
-        opts.on("-d", "--debug", "Emit debugging symbols") do
-          options[:flags] << :debug
-        end
-        opts.on("--std STANDARD", "Specify the language standard") do |value|
-          options[:flags] << STANDARDS[value]
-        end
-        opts.on("-W", "--warn OPTION", "Configure warnings") do |value|
-          options[:flags] << WARNING_CONFIGS[value]
-        end
-        opts.on("--shared", "Produce a shared library") { options[:flags] << :shared }
-        opts.on("--static", "Produce a static library") { options[:flags] << :static }
-        opts.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
-
-        LONG_FLAGS.each do |name, sym|
-          opts.on("--#{name}") { options[:flags] << sym }
-        end
-
-        XFLAGS.each do |name, tc_sym|
-          opts.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_sym} toolchain") do |v|
-            options[:xflags][tc_sym] ||= []
-            options[:xflags][tc_sym] << v
-          end
-        end
-      end
-
-      sources = parser.parse(argv)
+      options = { includes: [], defines: [], output: nil, flags: [], xflags: {},
+                  libs: [], linker_include_dirs: [] }
+      parser = OptionParser.new
+      setup_link_options(parser, options)
+      setup_compile_options(parser, options)
+      sources = parser.permute(argv)
       [options, sources]
     end
 
@@ -161,19 +123,9 @@ module MetaCC
     # Output type defaults to executable; use --shared or --static to override.
     def parse_link_args(argv)
       options = { output: nil, libs: [], linker_include_dirs: [], flags: [] }
-      parser = OptionParser.new do |opts|
-        opts.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
-        opts.on("--shared", "Produce a shared library") { options[:flags] << :shared }
-        opts.on("--static", "Produce a static library") { options[:flags] << :static }
-        opts.on("-l LIB", "--lib LIB", "Link against library LIB") do |v|
-          options[:libs] << v
-        end
-        opts.on("-L DIR", "--libdir DIR", "Add linker library search path") do |v|
-          options[:linker_include_dirs] << v
-        end
-      end
-      objects = parser.parse(argv)
-
+      parser = OptionParser.new
+      setup_link_options(parser, options)
+      objects = parser.permute(argv)
       [options, objects]
     end
 
@@ -181,6 +133,38 @@ module MetaCC
 
     def build_driver
       Driver.new(stdout_sink: $stdout, stderr_sink: $stderr)
+    end
+
+    # Registers options common to all subcommands (output path, link type, libs).
+    def setup_link_options(parser, options)
+      parser.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
+      parser.on("--shared", "Produce a shared library") { options[:flags] << :shared }
+      parser.on("--static", "Produce a static library") { options[:flags] << :static }
+      parser.on("-l LIB", "--lib LIB", "Link against library LIB") { |v| options[:libs] << v }
+      parser.on("-L DIR", "--libdir DIR", "Add linker library search path") do |v|
+        options[:linker_include_dirs] << v
+      end
+    end
+
+    # Registers compile-only options (include paths, defines, code-gen flags, etc.).
+    def setup_compile_options(parser, options)
+      parser.on("-I", "--include DIRPATH", "Add an include search directory") do |v|
+        options[:includes] << v
+      end
+      parser.on("-D", "--define DEF", "Add a preprocessor definition") { |v| options[:defines] << v }
+      parser.on("-O LEVEL", /\A[0-3]\z/, "Optimization level (0–3)") { |l| options[:flags] << :"o#{l}" }
+      parser.on("-m", "--arch ARCH", "Target architecture") { |v| options[:flags] << TARGETS[v] }
+      parser.on("-d", "--debug", "Emit debugging symbols") { options[:flags] << :debug }
+      parser.on("--std STANDARD", "Specify the language standard") { |v| options[:flags] << STANDARDS[v] }
+      parser.on("-W", "--warn OPTION", "Configure warnings") { |v| options[:flags] << WARNING_CONFIGS[v] }
+      parser.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
+      LONG_FLAGS.each { |name, sym| parser.on("--#{name}") { options[:flags] << sym } }
+      XFLAGS.each do |name, tc_sym|
+        parser.on("--#{name} VALUE", String, "Pass VALUE to the #{tc_sym} toolchain") do |v|
+          options[:xflags][tc_sym] ||= []
+          options[:xflags][tc_sym] << v
+        end
+      end
     end
 
     OUTPUT_TYPE_FLAGS = %i[objects shared static].freeze
@@ -192,10 +176,12 @@ module MetaCC
         output = options[:output] || default_object_path(source)
         success = driver.invoke(
           source, output,
-          flags:         (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
-          xflags:        options[:xflags],
-          include_paths: options[:includes],
-          definitions:   options[:defines]
+          flags:               (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
+          xflags:              options[:xflags],
+          include_paths:       options[:includes],
+          definitions:         options[:defines],
+          libs:                options[:libs],
+          linker_include_dirs: options[:linker_include_dirs]
         )
         exit 1 unless success
       end
