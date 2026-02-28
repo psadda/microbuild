@@ -42,48 +42,48 @@ module MetaCC
     # Maps long-form CLI flag names to Driver::RECOGNIZED_FLAGS symbols.
     # Optimization-level flags are handled separately via -O LEVEL.
     LONG_FLAGS = {
-      "lto"           => :lto,
-      "asan"          => :asan,
-      "ubsan"         => :ubsan,
-      "msan"          => :msan,
-      "no-rtti"       => :no_rtti,
+      "lto" => :lto,
+      "asan" => :asan,
+      "ubsan" => :ubsan,
+      "msan" => :msan,
+      "no-rtti" => :no_rtti,
       "no-exceptions" => :no_exceptions,
-      "pic"           => :pic
+      "pic" => :pic
     }.freeze
 
     WARNING_CONFIGS = {
-      "all"      => :warn_all,
-      "error"    => :warn_error
+      "all" => :warn_all,
+      "error" => :warn_error
     }
 
     TARGETS = {
-      "sse4.2"   => :sse4_2,
-      "avx"      => :avx,
-      "avx2"     => :avx2,
-      "avx512"   => :avx512,
-      "native"   => :native
+      "sse4.2" => :sse4_2,
+      "avx" => :avx,
+      "avx2" => :avx2,
+      "avx512" => :avx512,
+      "native" => :native
     }.freeze
 
     C_STANDARDS = {
-      "c11"      => :c11,
-      "c17"      => :c17,
-      "c23"      => :c23
+      "c11" => :c11,
+      "c17" => :c17,
+      "c23" => :c23
     }.freeze
 
     CXX_STANDARDS = {
-      "c++11"    => :cxx11,
-      "c++14"    => :cxx14,
-      "c++17"    => :cxx17,
-      "c++20"    => :cxx20,
-      "c++23"    => :cxx23,
-      "c++26"    => :cxx26
+      "c++11" => :cxx11,
+      "c++14" => :cxx14,
+      "c++17" => :cxx17,
+      "c++20" => :cxx20,
+      "c++23" => :cxx23,
+      "c++26" => :cxx26
     }.freeze
 
     # Maps --x<name> CLI option names to xflags toolchain-class keys.
     XFLAGS = {
-      "xmsvc"    => MsvcToolchain,
-      "xgnu"     => GnuToolchain,
-      "xclang"   => ClangToolchain,
+      "xmsvc" => MsvcToolchain,
+      "xgnu" => GnuToolchain,
+      "xclang" => ClangToolchain,
       "xclangcl" => ClangClToolchain
     }.freeze
 
@@ -181,12 +181,12 @@ module MetaCC
         output = options[:output] || default_object_path(source)
         success = driver.invoke(
           source, output,
-          flags:               (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
-          xflags:              options[:xflags],
-          include_paths:       options[:includes],
-          defs:                options[:defines],
-          libs:                options[:libs],
-          linker_paths:        options[:linker_paths]
+          flags:         (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
+          xflags:        options[:xflags],
+          include_paths: options[:includes],
+          defs:          options[:defines],
+          libs:          options[:libs],
+          linker_paths:  options[:linker_paths]
         )
         exit 1 unless success
       end

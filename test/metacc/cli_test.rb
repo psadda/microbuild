@@ -302,7 +302,6 @@ class CLITest < Minitest::Test
     refute_includes options[:flags], :c11
   end
 
-
   def test_parse_compile_args_lib_short_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-l", "m", "main.c"])
@@ -374,7 +373,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _objects = cli.parse_link_args(["-l", "m", "-l", "pthread", "main.o"])
 
-    assert_equal ["m", "pthread"], options[:libs]
+    assert_equal %w[m pthread], options[:libs]
   end
 
   def test_parse_link_args_libdir_short_flag
@@ -439,6 +438,7 @@ class CLITest < Minitest::Test
     $stdout = StringIO.new
     begin
       cli.run(["--version"])
+
       assert_equal "stubbed compiler 1.0.0\n", $stdout.string
     ensure
       $stdout = old_stdout
@@ -458,7 +458,9 @@ class CLITest < Minitest::Test
   class StubDriver
 
     class StubToolchain < MetaCC::Toolchain
+
       def show_version = "stubbed compiler 1.0.0\n"
+
     end
 
     attr_reader :calls, :toolchain
@@ -534,6 +536,7 @@ class CLITest < Minitest::Test
     cli.run(["c", "--shared", "-o", "lib.so", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
+
     assert_includes flags, :shared
     refute_includes flags, :objects
   end
@@ -543,6 +546,7 @@ class CLITest < Minitest::Test
     cli.run(["c", "--static", "-o", "lib.a", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
+
     assert_includes flags, :static
     refute_includes flags, :objects
   end
@@ -632,8 +636,8 @@ class CLITest < Minitest::Test
 
     call = cli.stub_driver.calls.first
 
-    assert_equal ["m", "pthread"], call[:libs]
-    assert_equal ["/opt/lib"],     call[:linker_paths]
+    assert_equal %w[m pthread], call[:libs]
+    assert_equal ["/opt/lib"], call[:linker_paths]
   end
 
 end

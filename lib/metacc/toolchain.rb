@@ -32,7 +32,7 @@ module MetaCC
     # Returns the compiler version string by running the compiler with --version.
     # Returns stdout if non-empty, otherwise stderr.
     def show_version
-      IO.popen([c, "--version", err: :out], &:read)
+      IO.popen([c, "--version", { err: :out }], &:read)
     end
 
     # Returns a Hash mapping universal flags to native flags for this toolchain.
@@ -76,7 +76,7 @@ module MetaCC
     end
 
     def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
-      cc = (input_files.length == 1 && c_file?(input_files.first)) ? c : cxx
+      cc = input_files.length == 1 && c_file?(input_files.first) ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
       link_mode = !flags.include?("-c")
@@ -216,7 +216,7 @@ module MetaCC
 
     # MSVC prints its version banner to stderr when invoked with no arguments.
     def show_version
-      IO.popen([c, err: :out], &:read)
+      IO.popen([c, { err: :out }], &:read)
     end
 
     private

@@ -150,7 +150,7 @@ class DriverTest < Minitest::Test
       lib = File.join(dir, "libutil.so")
       File.write(src, "int add(int a, int b) { return a + b; }\n")
 
-      builder.invoke(src, obj, flags: [:objects, :pic])
+      builder.invoke(src, obj, flags: %i[objects pic])
       result = builder.invoke([obj], lib, flags: [:shared])
 
       assert result, "expected invoke to return true"
@@ -256,7 +256,7 @@ class DriverTest < Minitest::Test
       File.chmod(0o755, fake_gcc)
 
       builder = MetaCC::Driver.new(
-        prefer: [MetaCC::GnuToolchain],
+        prefer:       [MetaCC::GnuToolchain],
         search_paths: [dir]
       )
 

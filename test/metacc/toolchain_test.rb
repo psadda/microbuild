@@ -307,7 +307,7 @@ class GnuToolchainCommandTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_libs_produce_dash_l_flags_in_link_mode
-    cmd = gnu.command(["main.o"], "main", [], [], [], ["m", "pthread"], [])
+    cmd = gnu.command(["main.o"], "main", [], [], [], %w[m pthread], [])
 
     assert_includes cmd, "-lm"
     assert_includes cmd, "-lpthread"
@@ -363,7 +363,7 @@ class MsvcToolchainCommandTest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_libs_produce_dot_lib_in_link_mode
-    cmd = msvc.command(["main.obj"], "main.exe", [], [], [], ["user32", "gdi32"], [])
+    cmd = msvc.command(["main.obj"], "main.exe", [], [], [], %w[user32 gdi32], [])
 
     assert_includes cmd, "user32.lib"
     assert_includes cmd, "gdi32.lib"
