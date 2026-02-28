@@ -12,10 +12,14 @@ module MetaCC
   #   cxx <sources...> -o <output> [options]       – compile C++ source file(s)
   #   link <objects...> -o <output> [options]      – link object files (default: executable)
   #
-  # Link output type flags (mutually exclusive; default produces an executable):
+  # Output type flags for c/cxx (default produces object files):
   #   --shared           – produce a shared library
   #   --static           – produce a static library
-  #   --objects / -c     – produce object files
+  #   --objects / -c     – produce object files (explicit; same as default)
+  #
+  # Output type flags for link (default produces an executable):
+  #   --shared           – produce a shared library
+  #   --static           – produce a static library
   #
   # Recognised flags (passed to Driver#compile via flags:):
   #   -O0 -O1 -O2 -O3
@@ -132,6 +136,9 @@ module MetaCC
         opts.on("-W", "--warn OPTION", "Configure warnings") do |value|
           options[:flags] << WARNING_CONFIGS[value]
         end
+        opts.on("--shared", "Produce a shared library") { options[:flags] << :shared }
+        opts.on("--static", "Produce a static library") { options[:flags] << :static }
+        opts.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
 
         LONG_FLAGS.each do |name, sym|
           opts.on("--#{name}") { options[:flags] << sym }
@@ -151,14 +158,13 @@ module MetaCC
 
     # Parses link subcommand arguments.
     # Returns [options_hash, remaining_positional_args].
-    # Output type defaults to executable; use --shared, --static, or --objects/-c to override.
+    # Output type defaults to executable; use --shared or --static to override.
     def parse_link_args(argv)
       options = { output: nil, libs: [], linker_include_dirs: [], flags: [] }
       parser = OptionParser.new do |opts|
         opts.on("-o FILEPATH", "Output file path") { |v| options[:output] = v }
         opts.on("--shared", "Produce a shared library") { options[:flags] << :shared }
         opts.on("--static", "Produce a static library") { options[:flags] << :static }
-        opts.on("-c", "--objects", "Produce object files") { options[:flags] << :objects }
         opts.on("-l LIB", "--lib LIB", "Link against library LIB") do |v|
           options[:libs] << v
         end
@@ -177,12 +183,16 @@ module MetaCC
       Driver.new(stdout_sink: $stdout, stderr_sink: $stderr)
     end
 
+    OUTPUT_TYPE_FLAGS = %i[objects shared static].freeze
+
     def compile_sources(driver, sources, options)
+      type_flags = options[:flags] & OUTPUT_TYPE_FLAGS
+      type_flags = [:objects] if type_flags.empty?
       sources.each do |source|
         output = options[:output] || default_object_path(source)
         success = driver.invoke(
           source, output,
-          flags:         options[:flags] + [:objects],
+          flags:         (options[:flags] - OUTPUT_TYPE_FLAGS) + type_flags,
           xflags:        options[:xflags],
           include_paths: options[:includes],
           definitions:   options[:defines]

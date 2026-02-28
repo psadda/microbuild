@@ -206,6 +206,46 @@ class CLITest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
+  # parse_compile_args – output type flags
+  # ---------------------------------------------------------------------------
+  def test_parse_compile_args_default_has_no_output_type_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["main.c"])
+
+    refute_includes options[:flags], :shared
+    refute_includes options[:flags], :static
+    refute_includes options[:flags], :objects
+  end
+
+  def test_parse_compile_args_shared_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--shared", "main.c"])
+
+    assert_includes options[:flags], :shared
+  end
+
+  def test_parse_compile_args_static_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--static", "main.c"])
+
+    assert_includes options[:flags], :static
+  end
+
+  def test_parse_compile_args_objects_long_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["--objects", "main.c"])
+
+    assert_includes options[:flags], :objects
+  end
+
+  def test_parse_compile_args_objects_short_flag
+    cli = MetaCC::CLI.new
+    options, _sources = cli.parse_compile_args(["-c", "main.c"])
+
+    assert_includes options[:flags], :objects
+  end
+
+  # ---------------------------------------------------------------------------
   # parse_link_args
   # ---------------------------------------------------------------------------
   def test_parse_link_args_default_produces_no_type_flags
@@ -227,20 +267,6 @@ class CLITest < Minitest::Test
     options, _objects = cli.parse_link_args(["--shared", "util.o"])
 
     assert_equal [:shared], options[:flags]
-  end
-
-  def test_parse_link_args_objects_long_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--objects", "a.o"])
-
-    assert_equal [:objects], options[:flags]
-  end
-
-  def test_parse_link_args_objects_short_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-c", "a.o"])
-
-    assert_equal [:objects], options[:flags]
   end
 
   def test_parse_link_args_output_flag
@@ -385,6 +411,45 @@ class CLITest < Minitest::Test
     assert_includes flags, :objects
   end
 
+  def test_run_compile_defaults_to_objects_when_no_type_flag
+    cli = TestCLI.new
+    cli.run(["c", "-o", "main.o", "main.c"])
+
+    assert_includes cli.stub_driver.calls.first[:flags], :objects
+  end
+
+  def test_run_compile_shared_flag
+    cli = TestCLI.new
+    cli.run(["c", "--shared", "-o", "lib.so", "main.c"])
+
+    flags = cli.stub_driver.calls.first[:flags]
+    assert_includes flags, :shared
+    refute_includes flags, :objects
+  end
+
+  def test_run_compile_static_flag
+    cli = TestCLI.new
+    cli.run(["c", "--static", "-o", "lib.a", "main.c"])
+
+    flags = cli.stub_driver.calls.first[:flags]
+    assert_includes flags, :static
+    refute_includes flags, :objects
+  end
+
+  def test_run_compile_objects_long_flag
+    cli = TestCLI.new
+    cli.run(["c", "--objects", "-o", "main.o", "main.c"])
+
+    assert_includes cli.stub_driver.calls.first[:flags], :objects
+  end
+
+  def test_run_compile_objects_short_flag
+    cli = TestCLI.new
+    cli.run(["c", "-c", "-o", "main.o", "main.c"])
+
+    assert_includes cli.stub_driver.calls.first[:flags], :objects
+  end
+
   def test_run_compile_forwards_includes_and_defines
     cli = TestCLI.new
     cli.run(["c", "-i", "/inc", "-d", "FOO=1", "-o", "main.o", "main.c"])
@@ -438,22 +503,6 @@ class CLITest < Minitest::Test
 
     assert_equal :invoke, cli.stub_driver.calls.first[:method]
     assert_includes cli.stub_driver.calls.first[:flags], :shared
-  end
-
-  def test_run_link_objects_long_flag_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "--objects", "-o", "a.o", "a.c"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :objects
-  end
-
-  def test_run_link_objects_short_flag_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "-c", "-o", "a.o", "a.c"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :objects
   end
 
   def test_run_link_forwards_libs_and_linker_include_dirs
