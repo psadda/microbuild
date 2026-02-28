@@ -408,3 +408,173 @@ class MsvcToolchainCommandTest < Minitest::Test
   end
 
 end
+
+class ToolchainLanguagesTest < Minitest::Test
+
+  # ---------------------------------------------------------------------------
+  # Default languages: toolchains that support both C and C++
+  # ---------------------------------------------------------------------------
+
+  def test_gnu_toolchain_supports_c_and_cxx
+    tc = Class.new(MetaCC::GnuToolchain) do
+      def command_available?(_cmd) = true
+    end.new
+
+    assert_equal [:c, :cxx], tc.languages
+  end
+
+  def test_clang_toolchain_supports_c_and_cxx
+    tc = Class.new(MetaCC::ClangToolchain) do
+      def command_available?(_cmd) = true
+    end.new
+
+    assert_equal [:c, :cxx], tc.languages
+  end
+
+  def test_msvc_toolchain_supports_c_and_cxx
+    tc = Class.new(MetaCC::MsvcToolchain) do
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end.new
+
+    assert_equal [:c, :cxx], tc.languages
+  end
+
+  def test_clang_cl_toolchain_supports_c_and_cxx
+    tc = Class.new(MetaCC::ClangClToolchain) do
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end.new
+
+    assert_equal [:c, :cxx], tc.languages
+  end
+
+  # ---------------------------------------------------------------------------
+  # TinyCC: C only
+  # ---------------------------------------------------------------------------
+
+  def test_tinycc_toolchain_supports_c_only
+    tc = Class.new(MetaCC::TinyccToolchain) do
+      def command_available?(_cmd) = true
+    end.new
+
+    assert_equal [:c], tc.languages
+  end
+
+end
+
+class TinyccToolchainTest < Minitest::Test
+
+  def tcc
+    Class.new(MetaCC::TinyccToolchain) do
+      def command_available?(_cmd) = true
+    end.new
+  end
+
+  # ---------------------------------------------------------------------------
+  # Constructor postconditions
+  # ---------------------------------------------------------------------------
+
+  def test_compiler_command_is_tcc
+    assert_equal "tcc", tcc.c
+  end
+
+  def test_cxx_is_nil
+    assert_nil tcc.cxx
+  end
+
+  def test_available_returns_true_when_tcc_present
+    assert_predicate tcc, :available?
+  end
+
+  def test_not_available_when_tcc_absent
+    tc = Class.new(MetaCC::TinyccToolchain) do
+      def command_available?(_cmd) = false
+    end.new
+
+    refute_predicate tc, :available?
+  end
+
+  # ---------------------------------------------------------------------------
+  # command: structure
+  # ---------------------------------------------------------------------------
+
+  def test_command_starts_with_tcc
+    cmd = tcc.command(["main.c"], "main", [], [], [], [], [])
+
+    assert_equal "tcc", cmd.first
+  end
+
+  def test_command_includes_output_flag
+    cmd = tcc.command(["main.c"], "main", [], [], [], [], [])
+
+    assert_includes cmd, "-o"
+    assert_equal "main", cmd[cmd.index("-o") + 1]
+  end
+
+  def test_include_paths_produce_dash_I_flags
+    cmd = tcc.command(["main.c"], "main", [], ["/usr/include", "/opt/include"], [], [], [])
+
+    assert_includes cmd, "-I/usr/include"
+    assert_includes cmd, "-I/opt/include"
+  end
+
+  def test_definitions_produce_dash_D_flags
+    cmd = tcc.command(["main.c"], "main", [], [], %w[FOO BAR=1], [], [])
+
+    assert_includes cmd, "-DFOO"
+    assert_includes cmd, "-DBAR=1"
+  end
+
+  def test_libs_produce_dash_l_flags_in_link_mode
+    cmd = tcc.command(["main.o"], "main", [], [], [], %w[m pthread], [])
+
+    assert_includes cmd, "-lm"
+    assert_includes cmd, "-lpthread"
+  end
+
+  def test_libs_omitted_in_compile_only_mode
+    cmd = tcc.command(["main.c"], "main.o", ["-c"], [], [], ["m"], [])
+
+    refute_includes cmd, "-lm"
+  end
+
+  def test_linker_include_dirs_produce_dash_L_flags_in_link_mode
+    cmd = tcc.command(["main.o"], "main", [], [], [], [], ["/opt/lib"])
+
+    assert_includes cmd, "-L/opt/lib"
+  end
+
+  def test_linker_include_dirs_omitted_in_compile_only_mode
+    cmd = tcc.command(["main.c"], "main.o", ["-c"], [], [], [], ["/opt/lib"])
+
+    refute_includes cmd, "-L/opt/lib"
+  end
+
+  # ---------------------------------------------------------------------------
+  # Flags
+  # ---------------------------------------------------------------------------
+
+  def test_flags_returns_tinycc_flags
+    assert_equal MetaCC::TinyccToolchain::TINYCC_FLAGS, tcc.flags
+  end
+
+  def test_objects_flag_maps_to_dash_c
+    assert_equal ["-c"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:objects]
+  end
+
+  def test_shared_flag_maps_to_dash_shared
+    assert_equal ["-shared"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:shared]
+  end
+
+  def test_debug_flag_maps_to_dash_g
+    assert_equal ["-g"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:debug]
+  end
+
+  def test_o3_maps_to_o2_since_tcc_lacks_o3
+    assert_equal ["-O2"], MetaCC::TinyccToolchain::TINYCC_FLAGS[:o3]
+  end
+
+end

@@ -21,6 +21,13 @@ module MetaCC
       command_available?(c)
     end
 
+    # Returns the languages supported by this toolchain as an array of symbols.
+    # The default implementation returns [:c, :cxx].  Subclasses that only
+    # support a subset of languages should override this method.
+    def languages
+      [:c, :cxx]
+    end
+
     # Returns true if +command+ is present in PATH, false otherwise.
     # Intentionally ignores the exit status – only ENOENT (not found) matters.
     def command_available?(command)
@@ -318,6 +325,70 @@ module MetaCC
 
     def flags
       CLANG_CL_FLAGS
+    end
+
+  end
+
+  # TinyCC toolchain (tcc).  TinyCC only supports C, not C++.
+  class TinyccToolchain < Toolchain
+
+    def initialize(search_paths: [])
+      super
+      @c   = resolve_command("tcc")
+      @cxx = nil
+    end
+
+    # TinyCC does not support C++.
+    def languages
+      [:c]
+    end
+
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+      inc_flags = include_paths.map { |p| "-I#{p}" }
+      def_flags = definitions.map { |d| "-D#{d}" }
+      link_mode = !flags.include?("-c")
+      lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
+      lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
+      [c, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
+    end
+
+    TINYCC_FLAGS = {
+      o0:            [],
+      o1:            ["-O1"],
+      o2:            ["-O2"],
+      o3:            ["-O2"],
+      sse4_2:        [],
+      avx:           [],
+      avx2:          [],
+      avx512:        [],
+      native:        [],
+      debug:         ["-g"],
+      lto:           [],
+      warn_all:      ["-Wall"],
+      warn_error:    ["-Werror"],
+      c11:           [],
+      c17:           [],
+      c23:           [],
+      cxx11:         [],
+      cxx14:         [],
+      cxx17:         [],
+      cxx20:         [],
+      cxx23:         [],
+      cxx26:         [],
+      asan:          [],
+      ubsan:         [],
+      msan:          [],
+      no_rtti:       [],
+      no_exceptions: [],
+      pic:           [],
+      objects:       ["-c"],
+      shared:        ["-shared"],
+      static:        ["-c"],
+      strip:         []
+    }.freeze
+
+    def flags
+      TINYCC_FLAGS
     end
 
   end
