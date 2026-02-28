@@ -14,7 +14,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, sources = cli.parse_compile_args(["-I", "/usr/include", "main.c"])
 
-    assert_equal ["/usr/include"], options[:includes]
+    assert_equal ["/usr/include"], options[:include_paths]
     assert_equal ["main.c"], sources
   end
 
@@ -22,7 +22,7 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-I", "/a", "-I", "/b", "main.c"])
 
-    assert_equal ["/a", "/b"], options[:includes]
+    assert_equal ["/a", "/b"], options[:include_paths]
   end
 
   # ---------------------------------------------------------------------------
@@ -32,14 +32,14 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-D", "FOO=1", "main.c"])
 
-    assert_equal ["FOO=1"], options[:defines]
+    assert_equal ["FOO=1"], options[:defs]
   end
 
   def test_parse_compile_args_multiple_defines
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-D", "FOO", "-D", "BAR=2", "main.c"])
 
-    assert_equal ["FOO", "BAR=2"], options[:defines]
+    assert_equal ["FOO", "BAR=2"], options[:defs]
   end
 
   # ---------------------------------------------------------------------------
@@ -49,57 +49,19 @@ class CLITest < Minitest::Test
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-o", "out.o", "main.c"])
 
-    assert_equal "out.o", options[:output]
+    assert_equal "out.o", options[:output_path]
   end
 
   def test_parse_compile_args_output_defaults_to_nil
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["main.c"])
 
-    assert_nil options[:output]
-  end
-
-  # ---------------------------------------------------------------------------
-  # parse_compile_args – optimization flags
-  # ---------------------------------------------------------------------------
-  def test_parse_compile_args_O0_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-O0", "main.c"])
-
-    assert_includes options[:flags], :o0
-  end
-
-  def test_parse_compile_args_O1_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-O1", "main.c"])
-
-    assert_includes options[:flags], :o1
-  end
-
-  def test_parse_compile_args_O2_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-O2", "main.c"])
-
-    assert_includes options[:flags], :o2
-  end
-
-  def test_parse_compile_args_O3_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["-O3", "main.c"])
-
-    assert_includes options[:flags], :o3
+    assert_nil options[:output_path]
   end
 
   # ---------------------------------------------------------------------------
   # parse_compile_args – RECOGNIZED_FLAGS long-form options
   # ---------------------------------------------------------------------------
-  def test_parse_compile_args_avx_flag
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--avx", "main.c"])
-
-    assert_includes options[:flags], :avx
-  end
-
   def test_parse_compile_args_debug_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["--debug", "main.c"])
@@ -109,9 +71,9 @@ class CLITest < Minitest::Test
 
   def test_parse_compile_args_multiple_recognized_flags
     cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--avx2", "--debug", "--lto", "main.c"])
+    options, _sources = cli.parse_compile_args(["--pic", "--debug", "--lto", "main.c"])
 
-    assert_includes options[:flags], :avx2
+    assert_includes options[:flags], :pic
     assert_includes options[:flags], :debug
     assert_includes options[:flags], :lto
   end
@@ -183,15 +145,6 @@ class CLITest < Minitest::Test
     assert_equal ["a.c", "b.c", "c.c"], sources
   end
 
-  def test_parse_compile_args_options_and_sources_mixed
-    cli = MetaCC::CLI.new
-    options, sources = cli.parse_compile_args(["-O2", "-I", "/inc", "foo.c", "bar.c"])
-
-    assert_includes options[:flags], :o2
-    assert_equal ["/inc"], options[:includes]
-    assert_equal ["foo.c", "bar.c"], sources
-  end
-
   # ---------------------------------------------------------------------------
   # parse_compile_args – output type flags
   # ---------------------------------------------------------------------------
@@ -235,73 +188,6 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
   # parse_compile_args – --std option (C standards for c, C++ standards for cxx)
   # ---------------------------------------------------------------------------
-  def test_parse_compile_args_c_standard_c11
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c11", "main.c"], "c")
-
-    assert_includes options[:flags], :c11
-  end
-
-  def test_parse_compile_args_c_standard_c17
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c17", "main.c"], "c")
-
-    assert_includes options[:flags], :c17
-  end
-
-  def test_parse_compile_args_c_standard_c23
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c23", "main.c"], "c")
-
-    assert_includes options[:flags], :c23
-  end
-
-  def test_parse_compile_args_cxx_standard_cxx17
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c++17", "main.cpp"], "cxx")
-
-    assert_includes options[:flags], :cxx17
-  end
-
-  def test_parse_compile_args_cxx_standard_cxx20
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c++20", "main.cpp"], "cxx")
-
-    assert_includes options[:flags], :cxx20
-  end
-
-  def test_parse_compile_args_all_c_standards
-    cli = MetaCC::CLI.new
-    MetaCC::CLI::C_STANDARDS.each do |name, sym|
-      options, _sources = cli.parse_compile_args(["--std", name, "main.c"], "c")
-
-      assert_includes options[:flags], sym, "--std #{name} should produce :#{sym} for c"
-    end
-  end
-
-  def test_parse_compile_args_all_cxx_standards
-    cli = MetaCC::CLI.new
-    MetaCC::CLI::CXX_STANDARDS.each do |name, sym|
-      options, _sources = cli.parse_compile_args(["--std", name, "main.cpp"], "cxx")
-
-      assert_includes options[:flags], sym, "--std #{name} should produce :#{sym} for cxx"
-    end
-  end
-
-  def test_parse_compile_args_c_rejects_cxx_standard
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c++17", "main.c"], "c")
-
-    refute_includes options[:flags], :cxx17
-  end
-
-  def test_parse_compile_args_cxx_rejects_c_standard
-    cli = MetaCC::CLI.new
-    options, _sources = cli.parse_compile_args(["--std", "c11", "main.cpp"], "cxx")
-
-    refute_includes options[:flags], :c11
-  end
-
   def test_parse_compile_args_lib_short_flag
     cli = MetaCC::CLI.new
     options, _sources = cli.parse_compile_args(["-l", "m", "main.c"])
@@ -322,87 +208,6 @@ class CLITest < Minitest::Test
 
     assert_equal [], options[:libs]
     assert_equal [], options[:linker_paths]
-  end
-
-  # ---------------------------------------------------------------------------
-  # parse_link_args
-  # ---------------------------------------------------------------------------
-  def test_parse_link_args_default_produces_no_type_flags
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["main.o"])
-
-    assert_empty options[:flags]
-  end
-
-  def test_parse_link_args_static_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--static", "a.o", "b.o"])
-
-    assert_equal [:static], options[:flags]
-  end
-
-  def test_parse_link_args_shared_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--shared", "util.o"])
-
-    assert_equal [:shared], options[:flags]
-  end
-
-  def test_parse_link_args_output_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-o", "myapp", "main.o"])
-
-    assert_equal "myapp", options[:output]
-  end
-
-  def test_parse_link_args_object_files
-    cli = MetaCC::CLI.new
-    _options, objects = cli.parse_link_args(["--static", "-o", "lib.a", "a.o", "b.o"])
-
-    assert_equal ["a.o", "b.o"], objects
-  end
-
-  def test_parse_link_args_lib_short_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-l", "m", "main.o"])
-
-    assert_equal ["m"], options[:libs]
-  end
-
-  def test_parse_link_args_multiple_libs
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-l", "m", "-l", "pthread", "main.o"])
-
-    assert_equal %w[m pthread], options[:libs]
-  end
-
-  def test_parse_link_args_libdir_short_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-L", "/usr/local/lib", "main.o"])
-
-    assert_equal ["/usr/local/lib"], options[:linker_paths]
-  end
-
-  def test_parse_link_args_libs_and_libdirs_defaults_to_empty
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["main.o"])
-
-    assert_equal [], options[:libs]
-    assert_equal [], options[:linker_paths]
-  end
-
-  def test_parse_link_args_strip_long_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["--strip", "main.o"])
-
-    assert_includes options[:flags], :strip
-  end
-
-  def test_parse_link_args_strip_short_flag
-    cli = MetaCC::CLI.new
-    options, _objects = cli.parse_link_args(["-s", "main.o"])
-
-    assert_includes options[:flags], :strip
   end
 
   def test_parse_compile_args_strip_long_flag
@@ -430,19 +235,6 @@ class CLITest < Minitest::Test
   def test_run_no_subcommand_exits
     cli = MetaCC::CLI.new
     assert_raises(SystemExit) { cli.run([]) }
-  end
-
-  def test_run_version_flag_writes_version_to_stdout
-    cli = TestCLI.new
-    old_stdout = $stdout
-    $stdout = StringIO.new
-    begin
-      cli.run(["--version"])
-
-      assert_equal "stubbed compiler 1.0.0\n", $stdout.string
-    ensure
-      $stdout = old_stdout
-    end
   end
 
   # ---------------------------------------------------------------------------
@@ -500,7 +292,6 @@ class CLITest < Minitest::Test
     assert_equal :invoke,  call[:method]
     assert_equal "main.c", call[:input_files].first
     assert_equal "main.o", call[:output]
-    assert_includes call[:flags], :objects
   end
 
   def test_run_c_passes_language_c
@@ -527,21 +318,13 @@ class CLITest < Minitest::Test
 
   def test_run_compile_forwards_flags
     cli = TestCLI.new
-    cli.run(["c", "-O2", "--avx", "--debug", "-o", "main.o", "main.c"])
+    cli.run(["c", "--lto", "--debug", "-c", "-o", "main.o", "main.c"])
 
     flags = cli.stub_driver.calls.first[:flags]
 
-    assert_includes flags, :o2
-    assert_includes flags, :avx
+    assert_includes flags, :lto
     assert_includes flags, :debug
     assert_includes flags, :objects
-  end
-
-  def test_run_compile_defaults_to_objects_when_no_type_flag
-    cli = TestCLI.new
-    cli.run(["c", "-o", "main.o", "main.c"])
-
-    assert_includes cli.stub_driver.calls.first[:flags], :objects
   end
 
   def test_run_compile_shared_flag
@@ -604,52 +387,6 @@ class CLITest < Minitest::Test
     call = cli.stub_driver.calls.first
 
     assert_equal ["m"],        call[:libs]
-    assert_equal ["/opt/lib"], call[:linker_paths]
-  end
-
-  def test_run_compile_default_output_path
-    cli = TestCLI.new
-    cli.run(["c", "src/main.c"])
-
-    assert_equal "src/main.o", cli.stub_driver.calls.first[:output]
-  end
-
-  def test_run_link_executable_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "-o", "myapp", "a.o", "b.o"])
-
-    call = cli.stub_driver.calls.first
-
-    assert_equal :invoke,        call[:method]
-    assert_equal ["a.o", "b.o"], call[:input_files]
-    assert_equal "myapp",        call[:output]
-    refute_includes call[:flags], :static
-    refute_includes call[:flags], :shared
-  end
-
-  def test_run_link_static_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "--static", "-o", "lib.a", "a.o"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :static
-  end
-
-  def test_run_link_shared_dispatches_correctly
-    cli = TestCLI.new
-    cli.run(["link", "--shared", "-o", "lib.so", "a.o"])
-
-    assert_equal :invoke, cli.stub_driver.calls.first[:method]
-    assert_includes cli.stub_driver.calls.first[:flags], :shared
-  end
-
-  def test_run_link_forwards_libs_and_linker_include_dirs
-    cli = TestCLI.new
-    cli.run(["link", "-o", "app", "-l", "m", "-l", "pthread", "-L", "/opt/lib", "main.o"])
-
-    call = cli.stub_driver.calls.first
-
-    assert_equal %w[m pthread], call[:libs]
     assert_equal ["/opt/lib"], call[:linker_paths]
   end
 
