@@ -457,14 +457,15 @@ class CLITest < Minitest::Test
   # A stub that records Driver#invoke calls without running subprocesses.
   class StubDriver
 
-    attr_reader :calls
+    StubToolchain = Struct.new(:type) do
+      def show_version = "stubbed compiler 1.0.0\n"
+    end
+
+    attr_reader :calls, :toolchain
 
     def initialize
       @calls = []
-    end
-
-    def show_version
-      "stubbed compiler 1.0.0\n"
+      @toolchain = StubToolchain.new(:clang)
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], definitions: [],

@@ -40,12 +40,12 @@ class DriverTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # #show_version
+  # toolchain#show_version
   # ---------------------------------------------------------------------------
-  def test_show_version_returns_non_empty_string
+  def test_toolchain_show_version_returns_non_empty_string
     driver = MetaCC::Driver.new
 
-    version = driver.show_version
+    version = driver.toolchain.show_version
 
     assert_kind_of String, version
     refute_empty version

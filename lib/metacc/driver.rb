@@ -102,11 +102,6 @@ module MetaCC
       run_command(cmd, env:, working_dir:)
     end
 
-    # Returns the version string reported by the detected compiler toolchain.
-    def show_version
-      @toolchain.show_version
-    end
-
     private
 
     def detect_toolchain!
