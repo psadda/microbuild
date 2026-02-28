@@ -471,9 +471,9 @@ class CLITest < Minitest::Test
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
-               libs: [], linker_paths: [], **)
+               libs: [], linker_paths: [], language: :c, **)
       @calls << { method: :invoke, input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, defs:, libs:, linker_paths: }
+                  include_paths:, defs:, libs:, linker_paths:, language: }
       true
     end
 
@@ -502,6 +502,20 @@ class CLITest < Minitest::Test
     assert_equal "main.c", call[:input_files].first
     assert_equal "main.o", call[:output]
     assert_includes call[:flags], :objects
+  end
+
+  def test_run_c_passes_language_c
+    cli = TestCLI.new
+    cli.run(["c", "-o", "main.o", "main.c"])
+
+    assert_equal :c, cli.stub_driver.calls.first[:language]
+  end
+
+  def test_run_cxx_passes_language_cxx
+    cli = TestCLI.new
+    cli.run(["cxx", "-o", "hello.o", "hello.cpp"])
+
+    assert_equal :cxx, cli.stub_driver.calls.first[:language]
   end
 
   def test_run_cxx_dispatches_invoke

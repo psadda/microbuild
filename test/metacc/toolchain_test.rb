@@ -337,6 +337,40 @@ class GnuToolchainCommandTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
+  # language: executable selection
+  # ---------------------------------------------------------------------------
+
+  def test_language_c_uses_c_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :c)
+
+    assert_equal "gcc", cmd.first
+  end
+
+  def test_language_cxx_uses_cxx_compiler
+    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :cxx)
+
+    assert_equal "g++", cmd.first
+  end
+
+  def test_language_c_on_cpp_file_still_uses_c_compiler
+    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :c)
+
+    assert_equal "gcc", cmd.first
+  end
+
+  def test_language_cxx_on_c_file_uses_cxx_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :cxx)
+
+    assert_equal "g++", cmd.first
+  end
+
+  def test_language_defaults_to_c_compiler
+    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [])
+
+    assert_equal "gcc", cmd.first
+  end
+
+  # ---------------------------------------------------------------------------
   # strip flag
   # ---------------------------------------------------------------------------
 

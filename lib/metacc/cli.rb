@@ -89,7 +89,7 @@ module MetaCC
       "xclangcl" => ClangClToolchain
     }.freeze
 
-    def run(argv, driver: Driver.new)
+    def run(argv, driver: build_driver)
       argv = argv.dup
       subcommand = argv.shift
 
@@ -97,7 +97,8 @@ module MetaCC
       when "c", "cxx"
         options, input_paths = parse_compile_args(argv, subcommand)
         output_path = options.delete(:output_path)
-        invoke(driver, input_paths, output_path, options)
+        language = subcommand == "cxx" ? :cxx : :c
+        invoke(driver, input_paths, output_path, options, language:)
       else
         warn "Usage: metacc <c|cxx> [options] <files...>"
         exit 1
@@ -124,6 +125,10 @@ module MetaCC
     end
 
     private
+
+    def build_driver
+      Driver.new
+    end
 
     def setup_compile_options(parser, options, standards)
       parser.on("-o FILEPATH", "Output file path") do |value|
@@ -181,8 +186,8 @@ module MetaCC
       end
     end
 
-    def invoke(driver, input_paths, output_path, options)
-      success = driver.invoke(sources, output_path, **options)
+    def invoke(driver, input_paths, output_path, options, language: :c)
+      success = driver.invoke(input_paths, output_path, language:, **options)
       exit 1 unless success
     end
 

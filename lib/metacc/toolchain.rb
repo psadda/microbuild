@@ -49,7 +49,9 @@ module MetaCC
     # Returns the full command array for the given inputs, output, and flags.
     # The output mode (object files, shared library, static library, or
     # executable) is determined by the translated flags.
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+    # +language+ selects which compiler executable to invoke: :c uses the C
+    # compiler and :cxx uses the C++ compiler.
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
       raise RuntimeError, "#{self.class}#command not implemented"
     end
 
@@ -81,8 +83,8 @@ module MetaCC
       @cxx  = resolve_command("g++")
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
-      cc = input_files.length == 1 && c_file?(input_files.first) ? c : cxx
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
+      cc = language == :c ? c : cxx
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
       link_mode = !flags.include?("-c")
@@ -166,7 +168,7 @@ module MetaCC
       setup_msvc_environment(resolved_cmd)
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
       inc_flags = include_paths.map { |p| "/I#{p}" }
       def_flags = definitions.map { |d| "/D#{d}" }
 
@@ -343,7 +345,7 @@ module MetaCC
       [:c]
     end
 
-    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs)
+    def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
       inc_flags = include_paths.map { |p| "-I#{p}" }
       def_flags = definitions.map { |d| "-D#{d}" }
       link_mode = !flags.include?("-c")
