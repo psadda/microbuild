@@ -57,10 +57,9 @@ module MetaCC
       @stdout_sink = stdout_sink
       @stderr_sink = stderr_sink
       @output_dir = output_dir
-      @prefer = prefer
       @toolchain_search_paths = toolchain_search_paths
       @log = []
-      @toolchain = detect_toolchain!
+      @toolchain = select_toolchain!(prefer)
     end
 
     # Invokes the compiler driver for the given input files and output path.
@@ -110,8 +109,8 @@ module MetaCC
 
     private
 
-    def detect_toolchain!
-      toolchain_classes.each do |klass|
+    def select_toolchain!(prefer)
+      prefer.each do |klass|
         tc = klass.new(search_paths: @toolchain_search_paths)
         return tc if tc.available?
       end
@@ -125,10 +124,6 @@ module MetaCC
       end
 
       flags.flat_map { |flag| @toolchain.flags[flag] }
-    end
-
-    def toolchain_classes
-      @prefer
     end
 
     def run_command(cmd, env: {}, working_dir: ".")

@@ -28,15 +28,7 @@ class DriverTest < Minitest::Test
   end
 
   def test_raises_when_no_compiler_found
-    # Use an anonymous subclass with no toolchain classes to probe.
-    klass = Class.new(MetaCC::Driver) do
-      private
-
-      def toolchain_classes
-        []
-      end
-    end
-    assert_raises(MetaCC::CompilerNotFoundError) { klass.new }
+    assert_raises(MetaCC::CompilerNotFoundError) { MetaCC::Driver.new(prefer: []) }
   end
 
   # ---------------------------------------------------------------------------
