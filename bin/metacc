@@ -5,4 +5,4 @@ $LOAD_PATH.unshift(File.join(__dir__, "..", "lib"))
 
 require "metacc/cli"
 
-MetaCC::CLI.run
+MetaCC::CLI.new.run(ARGV)

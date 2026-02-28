@@ -89,10 +89,6 @@ module MetaCC
       "xclangcl" => ClangClToolchain
     }.freeze
 
-    def self.run(argv = ARGV)
-      new.run(argv)
-    end
-
     def run(argv, driver: Driver.new)
       argv = argv.dup
       subcommand = argv.shift
