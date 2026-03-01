@@ -16,6 +16,10 @@ class CLITest < Minitest::Test
       @calls = []
     end
 
+    def toolchain
+      @toolchain ||= StubToolchain.new
+    end
+
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
                libs: [], linker_paths: [], **)
       @calls << { input_files: Array(input_files), output:, flags:, xflags:,
@@ -24,6 +28,15 @@ class CLITest < Minitest::Test
       # true when output is nil (e.g. --objects without -o) so that the CLI's
       # `exit 1 unless result` check still considers the invocation successful.
       output || true
+    end
+
+  end
+
+  # A minimal toolchain stub that returns a fixed version banner string.
+  class StubToolchain
+
+    def version_banner
+      "stub-compiler 1.0\n"
     end
 
   end
@@ -364,6 +377,22 @@ class CLITest < Minitest::Test
 
   def test_run_with_static_exits
     assert_raises(SystemExit) { run_cli(["-r", "--static", "-o", "lib.a", "main.c"]) }
+  end
+
+  # ---------------------------------------------------------------------------
+  # --help / --version
+  # ---------------------------------------------------------------------------
+
+  def test_help_flag_exits
+    assert_raises(SystemExit) { MetaCC::CLI.new.run(["--help"], driver: StubDriver.new) }
+  end
+
+  def test_version_flag_prints_banner_and_exits
+    stub = StubDriver.new
+    out, = capture_io do
+      assert_raises(SystemExit) { MetaCC::CLI.new.run(["--version"], driver: stub) }
+    end
+    assert_includes out, stub.toolchain.version_banner
   end
 
 end
