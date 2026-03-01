@@ -281,4 +281,99 @@ class DriverTest < Minitest::Test
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # #invoke return value – output path on success, nil on failure
+  # ---------------------------------------------------------------------------
+  def test_invoke_returns_output_path_string_on_success
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.invoke(src, obj, flags: [:objects])
+
+      assert_equal obj, result
+    end
+  end
+
+  def test_invoke_returns_nil_on_failure
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "broken.c")
+      obj = File.join(dir, "broken.o")
+      File.write(src, "this is not valid C code {\n")
+
+      result = builder.invoke(src, obj, flags: [:objects])
+
+      assert_nil result
+    end
+  end
+
+  def test_invoke_returns_output_path_for_executable
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "main.c")
+      obj = File.join(dir, "main.o")
+      exe = File.join(dir, "main")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      builder.invoke(src, obj, flags: [:objects])
+      result = builder.invoke([obj], exe)
+
+      assert_equal exe, result
+    end
+  end
+
+  def test_invoke_returns_nil_for_missing_object
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      result = builder.invoke([File.join(dir, "nonexistent.o")], File.join(dir, "out"))
+
+      assert_nil result
+    end
+  end
+
+  # ---------------------------------------------------------------------------
+  # #invoke – nil output_path raises ArgumentError
+  # ---------------------------------------------------------------------------
+  def test_invoke_raises_argument_error_when_output_path_is_nil
+    builder = MetaCC::Driver.new
+
+    assert_raises(ArgumentError) { builder.invoke("hello.c", nil, flags: [:objects]) }
+  end
+
+  # ---------------------------------------------------------------------------
+  # #invoke – default extension appended when output_path has no extension
+  # ---------------------------------------------------------------------------
+  def test_invoke_appends_object_extension_when_no_extension_given
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      output_base = File.join(dir, "hello")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      expected_ext  = builder.toolchain.default_extension(:objects)
+      expected_path = "#{output_base}#{expected_ext}"
+
+      result = builder.invoke(src, output_base, flags: [:objects])
+
+      assert_equal expected_path, result
+      assert_path_exists expected_path
+    end
+  end
+
+  def test_invoke_does_not_modify_output_path_that_already_has_extension
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      obj = File.join(dir, "hello.o")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.invoke(src, obj, flags: [:objects])
+
+      assert_equal obj, result
+    end
+  end
+
 end

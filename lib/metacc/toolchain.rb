@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rbconfig"
+
 module MetaCC
 
   # Base class for compiler toolchains.
@@ -53,6 +55,32 @@ module MetaCC
     # compiler and :cxx uses the C++ compiler.
     def command(input_files, output, flags, include_paths, definitions, libs, linker_include_dirs, language: :c)
       raise RuntimeError, "#{self.class}#command not implemented"
+    end
+
+    # Returns the default file extension (with leading dot, e.g. ".o") for the
+    # given output type on this toolchain/OS combination.  Returns an empty
+    # string when no extension is conventional (e.g. executables on Unix).
+    #
+    # @param output_type [:objects, :shared, :static, :executable]
+    # @return [String]
+    def default_extension(output_type)
+      host_os = RbConfig::CONFIG["host_os"]
+      case output_type
+      when :objects    then ".o"
+      when :static     then ".a"
+      when :shared
+        if host_os.match?(/mswin|mingw|cygwin/)
+          ".dll"
+        elsif host_os.match?(/darwin/)
+          ".dylib"
+        else
+          ".so"
+        end
+      when :executable
+        host_os.match?(/mswin|mingw|cygwin/) ? ".exe" : ""
+      else
+        raise ArgumentError, "unknown output_type: #{output_type.inspect}"
+      end
     end
 
     private
@@ -228,6 +256,19 @@ module MetaCC
 
     def flags
       MSVC_FLAGS
+    end
+
+    # MSVC and clang-cl always target Windows, so extensions are Windows-specific
+    # regardless of the host OS.
+    def default_extension(output_type)
+      case output_type
+      when :objects    then ".obj"
+      when :static     then ".lib"
+      when :shared     then ".dll"
+      when :executable then ".exe"
+      else
+        raise ArgumentError, "unknown output_type: #{output_type.inspect}"
+      end
     end
 
     # MSVC prints its version banner to stderr when invoked with no arguments.

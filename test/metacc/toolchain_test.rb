@@ -588,3 +588,99 @@ class TinyCCToolchainTest < Minitest::Test
   end
 
 end
+
+class ToolchainDefaultExtensionTest < Minitest::Test
+
+  # ---------------------------------------------------------------------------
+  # GNU / Clang: OS-based extensions
+  # ---------------------------------------------------------------------------
+
+  def gnu
+    Class.new(MetaCC::GNU) do
+      def command_available?(_cmd) = true
+    end.new
+  end
+
+  def test_gnu_objects_extension
+    assert_equal ".o", gnu.default_extension(:objects)
+  end
+
+  def test_gnu_static_extension
+    assert_equal ".a", gnu.default_extension(:static)
+  end
+
+  def test_gnu_shared_extension_on_current_os
+    host_os = RbConfig::CONFIG["host_os"]
+    expected =
+      if host_os.match?(/mswin|mingw|cygwin/) then ".dll"
+      elsif host_os.match?(/darwin/)           then ".dylib"
+      else ".so"
+      end
+
+    assert_equal expected, gnu.default_extension(:shared)
+  end
+
+  def test_gnu_executable_extension_on_current_os
+    host_os = RbConfig::CONFIG["host_os"]
+    expected = host_os.match?(/mswin|mingw|cygwin/) ? ".exe" : ""
+
+    assert_equal expected, gnu.default_extension(:executable)
+  end
+
+  # ---------------------------------------------------------------------------
+  # MSVC: always Windows extensions regardless of host OS
+  # ---------------------------------------------------------------------------
+
+  def msvc
+    Class.new(MetaCC::MSVC) do
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end.new
+  end
+
+  def test_msvc_objects_extension
+    assert_equal ".obj", msvc.default_extension(:objects)
+  end
+
+  def test_msvc_static_extension
+    assert_equal ".lib", msvc.default_extension(:static)
+  end
+
+  def test_msvc_shared_extension
+    assert_equal ".dll", msvc.default_extension(:shared)
+  end
+
+  def test_msvc_executable_extension
+    assert_equal ".exe", msvc.default_extension(:executable)
+  end
+
+  # ---------------------------------------------------------------------------
+  # ClangCL: inherits MSVC extensions
+  # ---------------------------------------------------------------------------
+
+  def clang_cl
+    Class.new(MetaCC::ClangCL) do
+      def command_available?(_cmd) = false
+      def run_vswhere(*)   = nil
+      def run_vcvarsall(*) = nil
+    end.new
+  end
+
+  def test_clang_cl_objects_extension
+    assert_equal ".obj", clang_cl.default_extension(:objects)
+  end
+
+  def test_clang_cl_static_extension
+    assert_equal ".lib", clang_cl.default_extension(:static)
+  end
+
+  def test_clang_cl_shared_extension
+    assert_equal ".dll", clang_cl.default_extension(:shared)
+  end
+
+  def test_clang_cl_executable_extension
+    assert_equal ".exe", clang_cl.default_extension(:executable)
+  end
+
+end
