@@ -58,8 +58,9 @@ module MetaCC
     # @param env            [Hash] environment variables to set for the subprocess
     # @param working_dir    [String] working directory for the subprocess (default: ".")
     # @param language        [:c, :cxx] the source language; selects the C or C++ compiler executable
-    # @return [String, Array<String>, nil] the output path (or array of output paths) on success,
+    # @return [String, nil] the (possibly extension-augmented) output path on success,
     #   nil if the underlying toolchain executable returned a non-zero exit status
+    # @raise [ArgumentError] if output_path is nil
     def invoke(
       input_files,
       output_path,
@@ -73,6 +74,11 @@ module MetaCC
       working_dir: ".",
       language: :c
     )
+      raise ArgumentError, "output_path must not be nil" if output_path.nil?
+
+      output_type = output_type_from_flags(flags)
+      output_path = apply_default_extension(output_path, output_type)
+
       input_files = Array(input_files)
       flags = translate_flags(flags)
       flags.concat(xflags[@toolchain.class] || [])
@@ -89,6 +95,21 @@ module MetaCC
         return toolchain if toolchain.available?
       end
       raise CompilerNotFoundError, "No supported C/C++ compiler found (tried clang, gcc, cl)"
+    end
+
+    def output_type_from_flags(flags)
+      if flags.include?(:objects)    then :objects
+      elsif flags.include?(:shared)  then :shared
+      elsif flags.include?(:static)  then :static
+      else :executable
+      end
+    end
+
+    def apply_default_extension(path, output_type)
+      return path unless File.extname(path).empty?
+
+      ext = @toolchain.default_extension(output_type)
+      ext.empty? ? path : "#{path}#{ext}"
     end
 
     def translate_flags(flags)
