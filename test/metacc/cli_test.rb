@@ -20,7 +20,24 @@ class CLITest < Minitest::Test
                libs: [], linker_paths: [], language: :c, **)
       @calls << { input_files: Array(input_files), output:, flags:, xflags:,
                   include_paths:, defs:, libs:, linker_paths:, language: }
-      true
+      # Return the output path like the real Driver on success; fall back to
+      # true when output is nil (e.g. --objects without -o) so that the CLI's
+      # `exit 1 unless result` check still considers the invocation successful.
+      output || true
+    end
+
+  end
+
+  # A CLI subclass that captures the path passed to run_executable instead of
+  # actually invoking a subprocess.  Used to assert the --run postcondition.
+  class SpyCLI < MetaCC::CLI
+
+    attr_reader :executed_path
+
+    private
+
+    def run_executable(path)
+      @executed_path = path
     end
 
   end
@@ -165,13 +182,13 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_objects_long_flag
-    call = first_call(run_cli(["c", "--objects", "-o", "main.o", "main.c"]))
+    call = first_call(run_cli(["c", "--objects", "main.c"]))
 
     assert_includes call[:flags], :objects
   end
 
   def test_objects_short_flag
-    call = first_call(run_cli(["c", "-c", "-o", "main.o", "main.c"]))
+    call = first_call(run_cli(["c", "-c", "main.c"]))
 
     assert_includes call[:flags], :objects
   end
@@ -293,11 +310,11 @@ class CLITest < Minitest::Test
   def test_full_c_invocation
     call = first_call(run_cli(["c", "--lto", "--debug", "-c",
                                "-I", "/inc", "-D", "FOO=1",
-                               "-o", "main.o", "main.c"]))
+                               "main.c"]))
 
     assert_equal :c,          call[:language]
     assert_equal ["main.c"],  call[:input_files]
-    assert_equal "main.o",    call[:output]
+    assert_nil                call[:output]
     assert_equal ["/inc"],    call[:include_paths]
     assert_equal ["FOO=1"],   call[:defs]
     assert_includes call[:flags], :lto
@@ -317,6 +334,58 @@ class CLITest < Minitest::Test
     assert_equal ["/usr/lib"],           call[:linker_paths]
     assert_includes call[:flags], :shared
     assert_includes call[:flags], :pic
+  end
+
+  # ---------------------------------------------------------------------------
+  # -o / --objects mutual exclusion validation
+  # ---------------------------------------------------------------------------
+
+  def test_missing_output_path_exits
+    assert_raises(SystemExit) { run_cli(["c", "main.c"]) }
+  end
+
+  def test_output_path_with_objects_exits
+    assert_raises(SystemExit) { run_cli(["c", "--objects", "-o", "main.o", "main.c"]) }
+  end
+
+  # ---------------------------------------------------------------------------
+  # --run / -r flag
+  # ---------------------------------------------------------------------------
+
+  def test_run_short_flag_executes_after_compilation
+    stub = StubDriver.new
+    cli = SpyCLI.new
+    cli.run(["c", "-r", "-o", "out", "main.c"], driver: stub)
+
+    assert_equal "out", cli.executed_path
+  end
+
+  def test_run_long_flag_executes_after_compilation
+    stub = StubDriver.new
+    cli = SpyCLI.new
+    cli.run(["c", "--run", "-o", "out", "main.c"], driver: stub)
+
+    assert_equal "out", cli.executed_path
+  end
+
+  def test_run_not_triggered_without_flag
+    stub = StubDriver.new
+    cli = SpyCLI.new
+    cli.run(["c", "-o", "out", "main.c"], driver: stub)
+
+    assert_nil cli.executed_path
+  end
+
+  def test_run_with_objects_exits
+    assert_raises(SystemExit) { run_cli(["c", "-r", "--objects", "main.c"]) }
+  end
+
+  def test_run_with_shared_exits
+    assert_raises(SystemExit) { run_cli(["c", "-r", "--shared", "-o", "lib.so", "main.c"]) }
+  end
+
+  def test_run_with_static_exits
+    assert_raises(SystemExit) { run_cli(["c", "-r", "--static", "-o", "lib.a", "main.c"]) }
   end
 
 end
