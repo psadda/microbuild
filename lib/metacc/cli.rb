@@ -7,14 +7,13 @@ module MetaCC
 
   # Command-line interface for the MetaCC Driver.
   #
-  # Subcommands:
-  #   c   <sources...> -o <output> [options]       – compile C source file(s)
-  #   cxx <sources...> -o <output> [options]       – compile C++ source file(s)
+  # Usage:
+  #   metacc <sources...> -o <output> [options]       – compile source file(s)
   #
   # General:
   #   -Wall -Werror
-  #   --std=c11 --std=c17 --std=c23                                             (c only)
-  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26  (cxx only)
+  #   --std=c11 --std=c17 --std=c23
+  #   --std=c++11 --std=c++14 --std=c++17 --std=c++20 --std=c++23 --std=c++26
   #
   # Linking:
   #   --objects / -c     – compile only; don't link
@@ -69,13 +68,10 @@ module MetaCC
       "native" => :native
     }.freeze
 
-    C_STANDARDS = {
-      "c11" => :c11,
-      "c17" => :c17,
-      "c23" => :c23
-    }.freeze
-
-    CXX_STANDARDS = {
+    STANDARDS = {
+      "c11"   => :c11,
+      "c17"   => :c17,
+      "c23"   => :c23,
       "c++11" => :cxx11,
       "c++14" => :cxx14,
       "c++17" => :cxx17,
@@ -93,26 +89,16 @@ module MetaCC
     }.freeze
 
     def run(argv, driver: Driver.new)
-      argv = argv.dup
-      subcommand = argv.shift
-
-      case subcommand
-      when "c", "cxx"
-        options, input_paths = parse_compile_args(argv, subcommand)
-        output_path = options.delete(:output_path)
-        run_flag = options.delete(:run)
-        language = subcommand == "cxx" ? :cxx : :c
-        validate_options!(options[:flags], output_path, run_flag)
-        invoke(driver, input_paths, output_path, options, language:, run: run_flag)
-      else
-        warn "Usage: metacc <c|cxx> [options] <files...>"
-        exit 1
-      end
+      options, input_paths = parse_compile_args(argv)
+      output_path = options.delete(:output_path)
+      run_flag = options.delete(:run)
+      validate_options!(options[:flags], output_path, run_flag)
+      invoke(driver, input_paths, output_path, options, run: run_flag)
     end
 
-    # Parses compile subcommand arguments.
+    # Parses compile arguments.
     # Returns [options_hash, remaining_positional_args].
-    def parse_compile_args(argv, subcommand = "c")
+    def parse_compile_args(argv)
       options = {
         include_paths: [],
         defs: [],
@@ -123,16 +109,15 @@ module MetaCC
         flags: [],
         xflags: {},
       }
-      standards = subcommand == "cxx" ? CXX_STANDARDS : C_STANDARDS
       parser = OptionParser.new
-      setup_compile_options(parser, options, standards)
+      setup_compile_options(parser, options)
       sources = parser.permute(argv)
       [options, sources]
     end
 
     private
 
-    def setup_compile_options(parser, options, standards)
+    def setup_compile_options(parser, options)
       parser.on("-o FILEPATH", "Output file path") do |value|
         options[:output_path] = value
       end
@@ -155,7 +140,7 @@ module MetaCC
         options[:flags] << :debug
       end
       parser.on("--std STANDARD", "Specify the language standard") do |value|
-        options[:flags] << standards[v]
+        options[:flags] << STANDARDS[v]
       end
       parser.on("-W OPTION", "Configure warnings") do |value|
         options[:flags] << WARNING_CONFIGS[v]
@@ -217,8 +202,8 @@ module MetaCC
       system(path)
     end
 
-    def invoke(driver, input_paths, output_path, options, language: :c, run: false)
-      result = driver.invoke(input_paths, output_path, language:, **options)
+    def invoke(driver, input_paths, output_path, options, run: false)
+      result = driver.invoke(input_paths, output_path, **options)
       exit 1 unless result
       run_executable(result) if run
     end
