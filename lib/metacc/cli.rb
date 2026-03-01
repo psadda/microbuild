@@ -100,8 +100,10 @@ module MetaCC
       when "c", "cxx"
         options, input_paths = parse_compile_args(argv, subcommand)
         output_path = options.delete(:output_path)
+        run_flag = options.delete(:run)
         language = subcommand == "cxx" ? :cxx : :c
-        invoke(driver, input_paths, output_path, options, language:)
+        validate_options!(options[:flags], output_path, run_flag)
+        invoke(driver, input_paths, output_path, options, language:, run: run_flag)
       else
         warn "Usage: metacc <c|cxx> [options] <files...>"
         exit 1
@@ -117,6 +119,7 @@ module MetaCC
         linker_paths: [],
         libs: [],
         output_path: nil,
+        run: false,
         flags: [],
         xflags: {},
       }
@@ -160,6 +163,9 @@ module MetaCC
       parser.on("-c", "--objects", "Produce object files") do
         options[:flags] << :objects
       end
+      parser.on("-r", "--run", "Run the compiled executable after a successful build") do
+        options[:run] = true
+      end
       parser.on("-l LIB", "Link against library LIB") do |value|
         options[:libs] << value
       end
@@ -188,9 +194,33 @@ module MetaCC
       end
     end
 
-    def invoke(driver, input_paths, output_path, options, language: :c)
-      success = driver.invoke(input_paths, output_path, language:, **options)
-      exit 1 unless success
+    def validate_options!(flags, output_path, run_flag)
+      objects = flags.include?(:objects)
+
+      if objects && output_path
+        warn "error: -o cannot be used with --objects"
+        exit 1
+      end
+
+      unless objects || output_path
+        warn "error: -o is required"
+        exit 1
+      end
+
+      if run_flag && (objects || flags.include?(:shared) || flags.include?(:static))
+        warn "error: --run cannot be used with --objects, --shared, or --static"
+        exit 1
+      end
+    end
+
+    def run_executable(path)
+      system(path)
+    end
+
+    def invoke(driver, input_paths, output_path, options, language: :c, run: false)
+      result = driver.invoke(input_paths, output_path, language:, **options)
+      exit 1 unless result
+      run_executable(result) if run
     end
 
   end
