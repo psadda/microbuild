@@ -89,7 +89,7 @@ module MetaCC
     }.freeze
 
     def run(argv, driver: Driver.new)
-      options, input_paths = parse_compile_args(argv)
+      options, input_paths = parse_compile_args(argv, driver:)
       output_path = options.delete(:output_path)
       run_flag = options.delete(:run)
       validate_options!(options[:flags], output_path, run_flag)
@@ -98,7 +98,7 @@ module MetaCC
 
     # Parses compile arguments.
     # Returns [options_hash, remaining_positional_args].
-    def parse_compile_args(argv)
+    def parse_compile_args(argv, driver: nil)
       options = {
         include_paths: [],
         defs: [],
@@ -110,14 +110,14 @@ module MetaCC
         xflags: {},
       }
       parser = OptionParser.new
-      setup_compile_options(parser, options)
+      setup_compile_options(parser, options, driver:)
       sources = parser.permute(argv)
       [options, sources]
     end
 
     private
 
-    def setup_compile_options(parser, options)
+    def setup_compile_options(parser, options, driver: nil)
       parser.on("-o FILEPATH", "Output file path") do |value|
         options[:output_path] = value
       end
@@ -176,6 +176,10 @@ module MetaCC
           options[:xflags][tc_class] ||= []
           options[:xflags][tc_class] << value
         end
+      end
+      parser.on_tail("--version", "Print the toolchain version and exit") do
+        puts driver&.toolchain&.version_banner
+        exit
       end
     end
 
