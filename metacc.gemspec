@@ -3,7 +3,7 @@
 Gem::Specification.new do |spec|
   spec.name          = "metacc"
   spec.version       = "0.1.0"
-  spec.authors       = ["metacc"]
+  spec.authors       = ["Praneeth Sadda"]
   spec.email         = "psadda@gmail.com"
   spec.summary       = "A small Ruby scripting system for building C and C++ applications"
   spec.description   = <<~DESC
