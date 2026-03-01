@@ -58,7 +58,8 @@ module MetaCC
     # @param env            [Hash] environment variables to set for the subprocess
     # @param working_dir    [String] working directory for the subprocess (default: ".")
     # @param language        [:c, :cxx] the source language; selects the C or C++ compiler executable
-    # @return [Boolean] true if invocation succeeded, false otherwise
+    # @return [String, Array<String>, nil] the output path (or array of output paths) on success,
+    #   nil if the underlying toolchain executable returned a non-zero exit status
     def invoke(
       input_files,
       output_path,
@@ -77,7 +78,7 @@ module MetaCC
       flags.concat(xflags[@toolchain.class] || [])
 
       cmd = @toolchain.command(input_files, output_path, flags, include_paths, defs, libs, linker_paths, language:)
-      run_command(cmd, env:, working_dir:)
+      run_command(cmd, env:, working_dir:) ? output_path : nil
     end
 
     private
