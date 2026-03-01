@@ -335,12 +335,46 @@ class DriverTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # #invoke – nil output_path raises ArgumentError
+  # #invoke – nil output_path raises ArgumentError only when :objects is absent
   # ---------------------------------------------------------------------------
-  def test_invoke_raises_argument_error_when_output_path_is_nil
+  def test_invoke_raises_argument_error_when_output_path_is_nil_and_no_objects_flag
     builder = MetaCC::Driver.new
 
-    assert_raises(ArgumentError) { builder.invoke("hello.c", nil, flags: [:objects]) }
+    assert_raises(ArgumentError) { builder.invoke("hello.c", nil) }
+  end
+
+  def test_invoke_with_nil_output_path_and_objects_flag_does_not_raise
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      assert_silent { builder.invoke(src, nil, flags: [:objects], working_dir: dir) }
+    end
+  end
+
+  def test_invoke_with_nil_output_path_and_objects_flag_returns_true_on_success
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "hello.c")
+      File.write(src, "int main(void) { return 0; }\n")
+
+      result = builder.invoke(src, nil, flags: [:objects], working_dir: dir)
+
+      assert_equal true, result
+    end
+  end
+
+  def test_invoke_with_nil_output_path_and_objects_flag_returns_nil_on_failure
+    builder = MetaCC::Driver.new
+    Dir.mktmpdir do |dir|
+      src = File.join(dir, "broken.c")
+      File.write(src, "this is not valid C code {\n")
+
+      result = builder.invoke(src, nil, flags: [:objects], working_dir: dir)
+
+      assert_nil result
+    end
   end
 
   # ---------------------------------------------------------------------------

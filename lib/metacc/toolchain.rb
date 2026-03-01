@@ -118,7 +118,8 @@ module MetaCC
       link_mode = !flags.include?("-c")
       lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
       lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
-      [cc, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
+      cmd = [cc, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags]
+      output.nil? ? cmd : [*cmd, "-o", output]
     end
 
     GNU_FLAGS = {
@@ -205,7 +206,8 @@ module MetaCC
       def_flags = definitions.map { |d| "/D#{d}" }
 
       if flags.include?("/c")
-        [c, *flags, *inc_flags, *def_flags, *input_files, "/Fo#{output}"]
+        cmd = [c, *flags, *inc_flags, *def_flags, *input_files]
+        output.nil? ? cmd : [*cmd, "/Fo#{output}"]
       else
         lib_flags      = libs.map { |l| "#{l}.lib" }
         lib_path_flags = linker_include_dirs.map { |p| "/LIBPATH:#{p}" }
@@ -400,7 +402,8 @@ module MetaCC
       link_mode = !flags.include?("-c")
       lib_path_flags = link_mode ? linker_include_dirs.map { |p| "-L#{p}" } : []
       lib_flags      = link_mode ? libs.map { |l| "-l#{l}" } : []
-      [c, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags, "-o", output]
+      cmd = [c, *flags, *inc_flags, *def_flags, *input_files, *lib_path_flags, *lib_flags]
+      output.nil? ? cmd : [*cmd, "-o", output]
     end
 
     TINYCC_FLAGS = {
