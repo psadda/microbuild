@@ -17,9 +17,9 @@ class CLITest < Minitest::Test
     end
 
     def invoke(input_files, output, flags: [], xflags: {}, include_paths: [], defs: [],
-               libs: [], linker_paths: [], language: :c, **)
+               libs: [], linker_paths: [], **)
       @calls << { input_files: Array(input_files), output:, flags:, xflags:,
-                  include_paths:, defs:, libs:, linker_paths:, language: }
+                  include_paths:, defs:, libs:, linker_paths: }
       # Return the output path like the real Driver on success; fall back to
       # true when output is nil (e.g. --objects without -o) so that the CLI's
       # `exit 1 unless result` check still considers the invocation successful.
@@ -60,31 +60,11 @@ class CLITest < Minitest::Test
   public
 
   # ---------------------------------------------------------------------------
-  # Subcommand validation
+  # Validation: missing output path
   # ---------------------------------------------------------------------------
 
-  def test_run_unknown_subcommand_exits
-    assert_raises(SystemExit) { run_cli(["unknown"]) }
-  end
-
-  def test_run_no_subcommand_exits
+  def test_run_missing_output_exits
     assert_raises(SystemExit) { run_cli([]) }
-  end
-
-  # ---------------------------------------------------------------------------
-  # Language selection
-  # ---------------------------------------------------------------------------
-
-  def test_c_subcommand_sets_language_to_c
-    call = first_call(run_cli(["c", "-o", "main.o", "main.c"]))
-
-    assert_equal :c, call[:language]
-  end
-
-  def test_cxx_subcommand_sets_language_to_cxx
-    call = first_call(run_cli(["cxx", "-o", "hello.o", "hello.cpp"]))
-
-    assert_equal :cxx, call[:language]
   end
 
   # ---------------------------------------------------------------------------
@@ -92,19 +72,19 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_source_files_forwarded_to_driver
-    call = first_call(run_cli(["c", "-o", "out", "a.c", "b.c", "c.c"]))
+    call = first_call(run_cli(["-o", "out", "a.c", "b.c", "c.c"]))
 
     assert_equal ["a.c", "b.c", "c.c"], call[:input_files]
   end
 
   def test_output_path_forwarded_to_driver
-    call = first_call(run_cli(["c", "-o", "main.o", "main.c"]))
+    call = first_call(run_cli(["-o", "main.o", "main.c"]))
 
     assert_equal "main.o", call[:output]
   end
 
   def test_cxx_source_forwarded_to_driver
-    call = first_call(run_cli(["cxx", "-o", "hello.o", "hello.cpp"]))
+    call = first_call(run_cli(["-o", "hello.o", "hello.cpp"]))
 
     assert_equal ["hello.cpp"], call[:input_files]
   end
@@ -114,13 +94,13 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_single_include_path
-    call = first_call(run_cli(["c", "-I", "/usr/include", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-I", "/usr/include", "-o", "out", "main.c"]))
 
     assert_equal ["/usr/include"], call[:include_paths]
   end
 
   def test_multiple_include_paths
-    call = first_call(run_cli(["c", "-I", "/a", "-I", "/b", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-I", "/a", "-I", "/b", "-o", "out", "main.c"]))
 
     assert_equal ["/a", "/b"], call[:include_paths]
   end
@@ -130,13 +110,13 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_single_define
-    call = first_call(run_cli(["c", "-D", "FOO=1", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-D", "FOO=1", "-o", "out", "main.c"]))
 
     assert_equal ["FOO=1"], call[:defs]
   end
 
   def test_multiple_defines
-    call = first_call(run_cli(["c", "-D", "FOO", "-D", "BAR=2", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-D", "FOO", "-D", "BAR=2", "-o", "out", "main.c"]))
 
     assert_equal ["FOO", "BAR=2"], call[:defs]
   end
@@ -146,13 +126,13 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_debug_long_flag
-    call = first_call(run_cli(["c", "--debug", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--debug", "-o", "out", "main.c"]))
 
     assert_includes call[:flags], :debug
   end
 
   def test_debug_short_flag
-    call = first_call(run_cli(["c", "-g", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-g", "-o", "out", "main.c"]))
 
     assert_includes call[:flags], :debug
   end
@@ -163,14 +143,14 @@ class CLITest < Minitest::Test
 
   def test_all_long_flags_forwarded
     MetaCC::CLI::LONG_FLAGS.each do |name, sym|
-      call = first_call(run_cli(["c", "--#{name}", "-o", "out", "main.c"]))
+      call = first_call(run_cli(["--#{name}", "-o", "out", "main.c"]))
 
       assert_includes call[:flags], sym, "--#{name} should forward :#{sym} to driver"
     end
   end
 
   def test_multiple_flags_combined
-    call = first_call(run_cli(["c", "--pic", "--debug", "--lto", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--pic", "--debug", "--lto", "-o", "out", "main.c"]))
 
     assert_includes call[:flags], :pic
     assert_includes call[:flags], :debug
@@ -182,33 +162,33 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_objects_long_flag
-    call = first_call(run_cli(["c", "--objects", "main.c"]))
+    call = first_call(run_cli(["--objects", "main.c"]))
 
     assert_includes call[:flags], :objects
   end
 
   def test_objects_short_flag
-    call = first_call(run_cli(["c", "-c", "main.c"]))
+    call = first_call(run_cli(["-c", "main.c"]))
 
     assert_includes call[:flags], :objects
   end
 
   def test_shared_flag
-    call = first_call(run_cli(["c", "--shared", "-o", "lib.so", "main.c"]))
+    call = first_call(run_cli(["--shared", "-o", "lib.so", "main.c"]))
 
     assert_includes call[:flags], :shared
     refute_includes call[:flags], :objects
   end
 
   def test_static_flag
-    call = first_call(run_cli(["c", "--static", "-o", "lib.a", "main.c"]))
+    call = first_call(run_cli(["--static", "-o", "lib.a", "main.c"]))
 
     assert_includes call[:flags], :static
     refute_includes call[:flags], :objects
   end
 
   def test_no_output_type_flags_by_default
-    call = first_call(run_cli(["c", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-o", "out", "main.c"]))
 
     refute_includes call[:flags], :shared
     refute_includes call[:flags], :static
@@ -220,13 +200,13 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_strip_long_flag
-    call = first_call(run_cli(["c", "--strip", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--strip", "-o", "out", "main.c"]))
 
     assert_includes call[:flags], :strip
   end
 
   def test_strip_short_flag
-    call = first_call(run_cli(["c", "-s", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-s", "-o", "out", "main.c"]))
 
     assert_includes call[:flags], :strip
   end
@@ -236,26 +216,26 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_lib_flag
-    call = first_call(run_cli(["c", "-l", "m", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-l", "m", "-o", "out", "main.c"]))
 
     assert_equal ["m"], call[:libs]
   end
 
   def test_libdir_flag
-    call = first_call(run_cli(["c", "-L", "/usr/local/lib", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-L", "/usr/local/lib", "-o", "out", "main.c"]))
 
     assert_equal ["/usr/local/lib"], call[:linker_paths]
   end
 
   def test_libs_and_libdirs_default_to_empty
-    call = first_call(run_cli(["c", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["-o", "out", "main.c"]))
 
     assert_equal [], call[:libs]
     assert_equal [], call[:linker_paths]
   end
 
   def test_libs_and_linker_paths_forwarded_together
-    call = first_call(run_cli(["c", "--shared", "-o", "lib.so", "-l", "m", "-L", "/opt/lib", "main.c"]))
+    call = first_call(run_cli(["--shared", "-o", "lib.so", "-l", "m", "-L", "/opt/lib", "main.c"]))
 
     assert_equal ["m"],        call[:libs]
     assert_equal ["/opt/lib"], call[:linker_paths]
@@ -266,37 +246,37 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_xmsvc_single_value
-    call = first_call(run_cli(["c", "--xmsvc", "Z7", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--xmsvc", "Z7", "-o", "out", "main.c"]))
 
     assert_equal ["Z7"], call[:xflags][MetaCC::MSVC]
   end
 
   def test_xmsvc_multiple_values
-    call = first_call(run_cli(["c", "--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--xmsvc", "Z7", "--xmsvc", "/EHc", "-o", "out", "main.c"]))
 
     assert_equal ["Z7", "/EHc"], call[:xflags][MetaCC::MSVC]
   end
 
   def test_xgnu_flag
-    call = first_call(run_cli(["c", "--xgnu", "-march=skylake", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--xgnu", "-march=skylake", "-o", "out", "main.c"]))
 
     assert_equal ["-march=skylake"], call[:xflags][MetaCC::GNU]
   end
 
   def test_xclang_flag
-    call = first_call(run_cli(["c", "--xclang", "-fcolor-diagnostics", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--xclang", "-fcolor-diagnostics", "-o", "out", "main.c"]))
 
     assert_equal ["-fcolor-diagnostics"], call[:xflags][MetaCC::Clang]
   end
 
   def test_xclangcl_flag
-    call = first_call(run_cli(["c", "--xclangcl", "/Ot", "-o", "out", "main.c"]))
+    call = first_call(run_cli(["--xclangcl", "/Ot", "-o", "out", "main.c"]))
 
     assert_equal ["/Ot"], call[:xflags][MetaCC::ClangCL]
   end
 
   def test_mixed_xflags
-    call = first_call(run_cli(["c", "--xmsvc", "Z7", "--xgnu", "-funroll-loops", "--xmsvc", "/EHc",
+    call = first_call(run_cli(["--xmsvc", "Z7", "--xgnu", "-funroll-loops", "--xmsvc", "/EHc",
                                "-o", "out", "main.c"]))
 
     assert_equal ["Z7", "/EHc"],     call[:xflags][MetaCC::MSVC]
@@ -308,11 +288,10 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_full_c_invocation
-    call = first_call(run_cli(["c", "--lto", "--debug", "-c",
+    call = first_call(run_cli(["--lto", "--debug", "-c",
                                "-I", "/inc", "-D", "FOO=1",
                                "main.c"]))
 
-    assert_equal :c,          call[:language]
     assert_equal ["main.c"],  call[:input_files]
     assert_nil                call[:output]
     assert_equal ["/inc"],    call[:include_paths]
@@ -323,11 +302,10 @@ class CLITest < Minitest::Test
   end
 
   def test_full_cxx_invocation
-    call = first_call(run_cli(["cxx", "--shared", "--pic",
+    call = first_call(run_cli(["--shared", "--pic",
                                "-l", "stdc++", "-L", "/usr/lib",
                                "-o", "libfoo.so", "foo.cpp", "bar.cpp"]))
 
-    assert_equal :cxx,                   call[:language]
     assert_equal ["foo.cpp", "bar.cpp"], call[:input_files]
     assert_equal "libfoo.so",            call[:output]
     assert_equal ["stdc++"],             call[:libs]
@@ -341,11 +319,11 @@ class CLITest < Minitest::Test
   # ---------------------------------------------------------------------------
 
   def test_missing_output_path_exits
-    assert_raises(SystemExit) { run_cli(["c", "main.c"]) }
+    assert_raises(SystemExit) { run_cli(["main.c"]) }
   end
 
   def test_output_path_with_objects_exits
-    assert_raises(SystemExit) { run_cli(["c", "--objects", "-o", "main.o", "main.c"]) }
+    assert_raises(SystemExit) { run_cli(["--objects", "-o", "main.o", "main.c"]) }
   end
 
   # ---------------------------------------------------------------------------
@@ -355,7 +333,7 @@ class CLITest < Minitest::Test
   def test_run_short_flag_executes_after_compilation
     stub = StubDriver.new
     cli = SpyCLI.new
-    cli.run(["c", "-r", "-o", "out", "main.c"], driver: stub)
+    cli.run(["-r", "-o", "out", "main.c"], driver: stub)
 
     assert_equal "out", cli.executed_path
   end
@@ -363,7 +341,7 @@ class CLITest < Minitest::Test
   def test_run_long_flag_executes_after_compilation
     stub = StubDriver.new
     cli = SpyCLI.new
-    cli.run(["c", "--run", "-o", "out", "main.c"], driver: stub)
+    cli.run(["--run", "-o", "out", "main.c"], driver: stub)
 
     assert_equal "out", cli.executed_path
   end
@@ -371,21 +349,21 @@ class CLITest < Minitest::Test
   def test_run_not_triggered_without_flag
     stub = StubDriver.new
     cli = SpyCLI.new
-    cli.run(["c", "-o", "out", "main.c"], driver: stub)
+    cli.run(["-o", "out", "main.c"], driver: stub)
 
     assert_nil cli.executed_path
   end
 
   def test_run_with_objects_exits
-    assert_raises(SystemExit) { run_cli(["c", "-r", "--objects", "main.c"]) }
+    assert_raises(SystemExit) { run_cli(["-r", "--objects", "main.c"]) }
   end
 
   def test_run_with_shared_exits
-    assert_raises(SystemExit) { run_cli(["c", "-r", "--shared", "-o", "lib.so", "main.c"]) }
+    assert_raises(SystemExit) { run_cli(["-r", "--shared", "-o", "lib.so", "main.c"]) }
   end
 
   def test_run_with_static_exits
-    assert_raises(SystemExit) { run_cli(["c", "-r", "--static", "-o", "lib.a", "main.c"]) }
+    assert_raises(SystemExit) { run_cli(["-r", "--static", "-o", "lib.a", "main.c"]) }
   end
 
 end

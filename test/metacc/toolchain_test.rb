@@ -41,7 +41,6 @@ class MsvcToolchainTest < Minitest::Test
     tc = klass.new
 
     assert_equal "cl", tc.c
-    assert_equal "cl", tc.cxx
   end
 
   def test_available_returns_true_when_cl_is_on_path
@@ -227,7 +226,6 @@ class ClangCLToolchainTest < Minitest::Test
     tc = stub_clang_cl_class(clang_cl_on_path: true).new
 
     assert_equal "clang-cl", tc.c
-    assert_equal "clang-cl", tc.cxx
   end
 
   def test_available_returns_true_when_clang_cl_is_on_path
@@ -337,34 +335,10 @@ class GnuToolchainCommandTest < Minitest::Test
   end
 
   # ---------------------------------------------------------------------------
-  # language: executable selection
+  # compiler executable
   # ---------------------------------------------------------------------------
 
-  def test_language_c_uses_c_compiler
-    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :c)
-
-    assert_equal "gcc", cmd.first
-  end
-
-  def test_language_cxx_uses_cxx_compiler
-    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :cxx)
-
-    assert_equal "g++", cmd.first
-  end
-
-  def test_language_c_on_cpp_file_still_uses_c_compiler
-    cmd = gnu.command(["main.cpp"], "main.o", ["-c"], [], [], [], [], language: :c)
-
-    assert_equal "gcc", cmd.first
-  end
-
-  def test_language_cxx_on_c_file_uses_cxx_compiler
-    cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [], language: :cxx)
-
-    assert_equal "g++", cmd.first
-  end
-
-  def test_language_defaults_to_c_compiler
+  def test_command_uses_gcc
     cmd = gnu.command(["main.c"], "main.o", ["-c"], [], [], [], [])
 
     assert_equal "gcc", cmd.first
@@ -513,10 +487,6 @@ class TinyCCToolchainTest < Minitest::Test
 
   def test_compiler_command_is_tcc
     assert_equal "tcc", tcc.c
-  end
-
-  def test_cxx_is_nil
-    assert_nil tcc.cxx
   end
 
   def test_available_returns_true_when_tcc_present
